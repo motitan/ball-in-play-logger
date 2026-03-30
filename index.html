@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f14" />
+    <title>Ball In Play Logger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="panel hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Public match event logger</p>
+          <h1>Ball In Play</h1>
+          <p class="hero-text">
+            Quick rugby event capture for iPhone and iPad. Track play, pause, and ruck events
+            from one public link, keep the session auto-saved in the browser, and export clean
+            CSV and JSON files to the device.
+          </p>
+        </div>
+
+        <div class="hero-meta" aria-label="Session status">
+          <article class="hero-stat">
+            <span class="hero-stat__label">Session save</span>
+            <strong id="savePill" class="hero-stat__value">Auto-save ready</strong>
+          </article>
+          <article class="hero-stat">
+            <span class="hero-stat__label">Match state</span>
+            <strong id="statePill" class="hero-stat__value">Paused</strong>
+          </article>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel clock-panel" aria-labelledby="clockTitle">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Live clock</p>
+              <h2 id="clockTitle">Elapsed match time</h2>
+            </div>
+            <span id="periodBadge" class="panel-badge">First Half</span>
+          </div>
+
+          <div class="clock-wrap">
+            <div id="clockDisplay" class="clock-display" aria-live="polite">00:00:00</div>
+            <p id="liveStatus" class="panel-note">Ready for your first event.</p>
+          </div>
+
+          <div class="control-strip" aria-label="Primary event controls">
+            <button id="playBtn" class="control-button control-button--play" type="button">
+              <span class="control-button__label">Play</span>
+              <span class="control-button__meta">Start or resume clock</span>
+            </button>
+            <button id="pauseBtn" class="control-button control-button--pause" type="button">
+              <span class="control-button__label">Pause</span>
+              <span class="control-button__meta">Stop clock and log event</span>
+            </button>
+            <button id="ruckBtn" class="control-button control-button--ruck" type="button">
+              <span class="control-button__label">Ruck</span>
+              <span class="control-button__meta">Mark event at current time</span>
+            </button>
+          </div>
+        </section>
+
+        <aside class="panel session-panel" aria-labelledby="sessionTitle">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Session</p>
+              <h2 id="sessionTitle">Match details</h2>
+            </div>
+          </div>
+
+          <label class="field" for="periodInput">
+            <span class="field__label">Period name</span>
+            <input
+              id="periodInput"
+              name="period"
+              type="text"
+              maxlength="48"
+              autocomplete="off"
+              placeholder="First Half"
+            />
+          </label>
+
+          <div class="metrics-grid" aria-label="Session summary">
+            <article class="metric-card">
+              <span class="metric-card__label">Events logged</span>
+              <strong id="eventCount" class="metric-card__value">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Rucks</span>
+              <strong id="ruckCount" class="metric-card__value">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Session started</span>
+              <strong id="sessionStarted" class="metric-card__value metric-card__value--small">
+                Not started
+              </strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Last event</span>
+              <strong id="lastEvent" class="metric-card__value metric-card__value--small">
+                None yet
+              </strong>
+            </article>
+          </div>
+
+          <div class="secondary-actions">
+            <button id="exportCsvBtn" class="secondary-button" type="button">Export CSV</button>
+            <button id="exportJsonBtn" class="secondary-button" type="button">Export JSON</button>
+            <button id="resetBtn" class="secondary-button secondary-button--danger" type="button">
+              Reset session
+            </button>
+          </div>
+
+          <p class="download-note">
+            Files download to the device's normal Downloads location. This web app does not store
+            data on the ESP32.
+          </p>
+        </aside>
+
+        <section class="panel log-panel" aria-labelledby="logTitle">
+          <div class="panel-heading panel-heading--log">
+            <div>
+              <p class="eyebrow">Event log</p>
+              <h2 id="logTitle">Captured actions</h2>
+            </div>
+            <p class="panel-note panel-note--tight">
+              Each event stores its own period snapshot, elapsed match time, and wall clock time.
+            </p>
+          </div>
+
+          <div class="log-head" aria-hidden="true">
+            <span>Event</span>
+            <span>Type</span>
+            <span>Period</span>
+            <span>Elapsed</span>
+            <span>Created</span>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <p class="empty-state__title">No events yet</p>
+            <p class="empty-state__text">
+              Start with <strong>Play</strong>, then add <strong>Ruck</strong> or
+              <strong>Pause</strong> as the match unfolds.
+            </p>
+          </div>
+
+          <div id="eventsList" class="event-list" role="list"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="srStatus" class="sr-only" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
