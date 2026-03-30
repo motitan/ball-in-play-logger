@@ -1,16 +1,19 @@
 # Ball In Play Logger
 
-Public static web app for logging `Play`, `Pause`, and `Ruck` events during a rugby match. The app is designed for iPhone and iPad use, keeps the current session auto-saved in the browser, and exports both CSV and JSON files to the device.
+Public static web app for logging rugby activity blocks with nested task and BIP structure. The app is designed for iPhone and iPad use, keeps the current session auto-saved in the browser, and exports CSV and JSON files whose names start with the activity name.
 
 ## Features
 
-- Large live match clock with `Play`, `Pause`, and `Ruck` actions
-- Editable period label such as `First Half`
+- Large live match clock with `Play` and `Pause`
+- Activity name, period name, and next task name inputs
+- `Start Task` / `End Task` workflow
+- Nested `Start BIP` / `End BIP` workflow inside the active task
+- `Ruck` point events attached to the active task
+- Interactive task visualization with clickable task bars, nested BIP bars, and ruck markers
 - Auto-saved session state using browser `localStorage`
-- Event log with event index, type, period, elapsed time, and wall-clock timestamp
 - Export to:
-  - `match-log-YYYYMMDD-HHMMSS.csv`
-  - `match-log-YYYYMMDD-HHMMSS.json`
+  - `activity-name-YYYYMMDD-HHMMSS.csv`
+  - `activity-name-YYYYMMDD-HHMMSS.json`
 - Fully static build with no backend and no ESP32 requirement
 
 ## Files
@@ -19,6 +22,7 @@ Public static web app for logging `Play`, `Pause`, and `Ruck` events during a ru
 - `styles.css`
 - `app.js`
 - `.impeccable.md`
+- `.nojekyll`
 
 ## Run locally
 
@@ -34,16 +38,9 @@ python3 -m http.server 8000
 http://localhost:8000
 ```
 
-## Deploy for free on GitHub Pages
+## Deploy on GitHub Pages
 
-1. Create a GitHub repository for these files.
-2. Push `index.html`, `styles.css`, `app.js`, and `.impeccable.md`.
-3. In GitHub, open `Settings > Pages`.
-4. Set:
-   - `Source`: `Deploy from a branch`
-   - `Branch`: `main`
-   - `Folder`: `/ (root)`
-5. GitHub will publish a free public URL.
+The app is already configured for GitHub Pages from the repository root. Push changes to `main` and Pages will serve the site.
 
 ## iPhone and iPad export behavior
 
@@ -55,18 +52,22 @@ http://localhost:8000
 
 The browser stores:
 
-- `sessionId`
-- `createdAt`
+- `activityName`
 - `currentPeriod`
+- `taskNameDraft`
 - `clockState`
 - `elapsedMs`
-- `lastStartedAt`
+- `activeTaskId`
+- `activeBipId`
+- `tasks[]`
 - `events[]`
 
-Each event stores:
+Each task stores:
 
-- `index`
-- `type`
+- `id`
+- `name`
 - `period`
-- `elapsedMs`
-- `createdAt`
+- `startElapsedMs`
+- `endElapsedMs`
+- `bips[]`
+- `rucks[]`

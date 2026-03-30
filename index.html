@@ -20,9 +20,9 @@
           <p class="eyebrow">Public match event logger</p>
           <h1>Ball In Play</h1>
           <p class="hero-text">
-            Quick rugby event capture for iPhone and iPad. Track play, pause, and ruck events
-            from one public link, keep the session auto-saved in the browser, and export clean
-            CSV and JSON files to the device.
+            Track full tasks, nested BIP windows, and ruck events from one public dashboard. The
+            session stays on the device, the task map stays interactive, and each export starts
+            with the selected activity name.
           </p>
         </div>
 
@@ -50,22 +50,58 @@
 
           <div class="clock-wrap">
             <div id="clockDisplay" class="clock-display" aria-live="polite">00:00:00</div>
-            <p id="liveStatus" class="panel-note">Ready for your first event.</p>
+            <p id="liveStatus" class="panel-note">Ready for your first task.</p>
           </div>
 
-          <div class="control-strip" aria-label="Primary event controls">
-            <button id="playBtn" class="control-button control-button--play" type="button">
-              <span class="control-button__label">Play</span>
-              <span class="control-button__meta">Start or resume clock</span>
-            </button>
-            <button id="pauseBtn" class="control-button control-button--pause" type="button">
-              <span class="control-button__label">Pause</span>
-              <span class="control-button__meta">Stop clock and log event</span>
-            </button>
-            <button id="ruckBtn" class="control-button control-button--ruck" type="button">
-              <span class="control-button__label">Ruck</span>
-              <span class="control-button__meta">Mark event at current time</span>
-            </button>
+          <div class="active-strip" aria-label="Current activity">
+            <article class="active-chip">
+              <span class="active-chip__label">Activity</span>
+              <strong id="activityBadge" class="active-chip__value">Activity</strong>
+            </article>
+            <article class="active-chip">
+              <span class="active-chip__label">Task</span>
+              <strong id="taskBadge" class="active-chip__value">No active task</strong>
+            </article>
+            <article class="active-chip">
+              <span class="active-chip__label">BIP</span>
+              <strong id="bipBadge" class="active-chip__value">No active BIP</strong>
+            </article>
+          </div>
+
+          <div class="control-block">
+            <p class="control-block__label">Clock</p>
+            <div class="control-strip control-strip--two" aria-label="Clock controls">
+              <button id="playBtn" class="control-button control-button--play" type="button">
+                <span class="control-button__label">Play</span>
+                <span class="control-button__meta">Start or resume the match clock</span>
+              </button>
+              <button id="pauseBtn" class="control-button control-button--pause" type="button">
+                <span class="control-button__label">Pause</span>
+                <span class="control-button__meta">Freeze the clock without losing the task map</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <p class="control-block__label">Annotations</p>
+            <div class="control-strip control-strip--three" aria-label="Annotation controls">
+              <button id="taskBtn" class="control-button control-button--task" type="button">
+                <span id="taskBtnLabel" class="control-button__label">Start Task</span>
+                <span id="taskBtnMeta" class="control-button__meta">
+                  Open a task using the task name field
+                </span>
+              </button>
+              <button id="bipBtn" class="control-button control-button--bip" type="button">
+                <span id="bipBtnLabel" class="control-button__label">Start BIP</span>
+                <span id="bipBtnMeta" class="control-button__meta">
+                  Add a nested ball-in-play interval inside the active task
+                </span>
+              </button>
+              <button id="ruckBtn" class="control-button control-button--ruck" type="button">
+                <span class="control-button__label">Ruck</span>
+                <span class="control-button__meta">Mark a point event on the active task</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -73,9 +109,21 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Session</p>
-              <h2 id="sessionTitle">Match details</h2>
+              <h2 id="sessionTitle">Activity details</h2>
             </div>
           </div>
+
+          <label class="field" for="activityNameInput">
+            <span class="field__label">Activity name</span>
+            <input
+              id="activityNameInput"
+              name="activity"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              placeholder="Warm Up Block"
+            />
+          </label>
 
           <label class="field" for="periodInput">
             <span class="field__label">Period name</span>
@@ -89,14 +137,34 @@
             />
           </label>
 
+          <label class="field" for="taskNameInput">
+            <span class="field__label">Next task name</span>
+            <input
+              id="taskNameInput"
+              name="task-name"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              placeholder="Kick Return Drill"
+            />
+          </label>
+
           <div class="metrics-grid" aria-label="Session summary">
             <article class="metric-card">
-              <span class="metric-card__label">Events logged</span>
-              <strong id="eventCount" class="metric-card__value">0</strong>
+              <span class="metric-card__label">Tasks</span>
+              <strong id="taskCount" class="metric-card__value">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">BIPs</span>
+              <strong id="bipCount" class="metric-card__value">0</strong>
             </article>
             <article class="metric-card">
               <span class="metric-card__label">Rucks</span>
               <strong id="ruckCount" class="metric-card__value">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-card__label">Events logged</span>
+              <strong id="eventCount" class="metric-card__value">0</strong>
             </article>
             <article class="metric-card">
               <span class="metric-card__label">Session started</span>
@@ -121,35 +189,96 @@
           </div>
 
           <p class="download-note">
-            Files download to the device's normal Downloads location. This web app does not store
-            data on the ESP32.
+            Export files start with the activity name and download to the device's normal
+            Downloads location.
           </p>
         </aside>
+
+        <section class="panel timeline-panel" aria-labelledby="timelineTitle">
+          <div class="panel-heading panel-heading--timeline">
+            <div>
+              <p class="eyebrow">Visualization</p>
+              <h2 id="timelineTitle">Task map</h2>
+            </div>
+            <p class="panel-note panel-note--tight">
+              Tap a task, BIP bar, or ruck marker to inspect it and verify nesting.
+            </p>
+          </div>
+
+          <div class="timeline-layout">
+            <div class="timeline-workbench">
+              <div id="timelineScale" class="timeline-scale" aria-hidden="true"></div>
+
+              <div id="timelineEmpty" class="empty-state">
+                <p class="empty-state__title">No tasks yet</p>
+                <p class="empty-state__text">
+                  Start the clock, open a task, then add BIP intervals inside that task to build
+                  the visualization.
+                </p>
+              </div>
+
+              <div id="timelineMap" class="timeline-map" role="list"></div>
+            </div>
+
+            <aside class="selection-card" aria-labelledby="selectionTitle">
+              <p class="eyebrow">Selection</p>
+              <h3 id="selectionTitle" class="selection-card__title">Session overview</h3>
+              <p id="selectionMeta" class="selection-meta">No task selected yet.</p>
+              <p id="selectionSummary" class="selection-summary">
+                Start the clock and open a task to create a nested BIP structure.
+              </p>
+
+              <dl class="selection-grid">
+                <div class="selection-item">
+                  <dt>Activity</dt>
+                  <dd id="selectionActivity">Activity</dd>
+                </div>
+                <div class="selection-item">
+                  <dt>Period</dt>
+                  <dd id="selectionPeriod">-</dd>
+                </div>
+                <div class="selection-item">
+                  <dt>Timing</dt>
+                  <dd id="selectionTiming">-</dd>
+                </div>
+                <div class="selection-item">
+                  <dt>Duration</dt>
+                  <dd id="selectionDuration">-</dd>
+                </div>
+                <div class="selection-item selection-item--wide">
+                  <dt>Context</dt>
+                  <dd id="selectionContext">-</dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
+        </section>
 
         <section class="panel log-panel" aria-labelledby="logTitle">
           <div class="panel-heading panel-heading--log">
             <div>
               <p class="eyebrow">Event log</p>
-              <h2 id="logTitle">Captured actions</h2>
+              <h2 id="logTitle">Event stream</h2>
             </div>
             <p class="panel-note panel-note--tight">
-              Each event stores its own period snapshot, elapsed match time, and wall clock time.
+              Every state change stays in the export, including task start or end and nested BIP
+              transitions.
             </p>
           </div>
 
           <div class="log-head" aria-hidden="true">
             <span>Event</span>
             <span>Type</span>
-            <span>Period</span>
+            <span>Context</span>
             <span>Elapsed</span>
             <span>Created</span>
           </div>
 
-          <div id="emptyState" class="empty-state">
+          <div id="eventsEmptyState" class="empty-state">
             <p class="empty-state__title">No events yet</p>
             <p class="empty-state__text">
-              Start with <strong>Play</strong>, then add <strong>Ruck</strong> or
-              <strong>Pause</strong> as the match unfolds.
+              Press <strong>Play</strong>, start a task, and the event stream will populate
+              automatically.
             </p>
           </div>
 
