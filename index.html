@@ -2,292 +2,278 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0f14" />
-    <title>Ball In Play Logger</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>BIP Logger</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260404-8" />
   </head>
   <body>
     <div class="app-shell">
-      <header class="panel hero-panel">
-        <div class="hero-copy">
-          <p class="eyebrow">Public match event logger</p>
-          <h1>Ball In Play</h1>
-          <p class="hero-text">
-            Track full tasks, nested BIP windows, and ruck events from one public dashboard. The
-            session stays on the device, the task map stays interactive, and each export starts
-            with the selected activity name.
-          </p>
+      <header class="top-bar">
+        <div class="top-bar__brand">
+          <svg viewBox="0 0 20 20" width="16" height="16">
+            <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2.2" fill="none" />
+            <circle cx="10" cy="10" r="2.5" fill="currentColor" />
+          </svg>
+          BIP
         </div>
-
-        <div class="hero-meta" aria-label="Session status">
-          <article class="hero-stat">
-            <span class="hero-stat__label">Session save</span>
-            <strong id="savePill" class="hero-stat__value">Auto-save ready</strong>
-          </article>
-          <article class="hero-stat">
-            <span class="hero-stat__label">Match state</span>
-            <strong id="statePill" class="hero-stat__value">Paused</strong>
-          </article>
+        <nav class="page-tabs" aria-label="Pages">
+          <a class="page-tab page-tab--active" href="./index.html" aria-current="page">Logger</a>
+          <a class="page-tab" href="./editor.html">Editor</a>
+        </nav>
+        <div class="top-bar__context">
+          <span class="top-bar__label">Activity</span>
+          <span id="activityBadge" class="top-bar__tag top-bar__tag--activity">Start activity</span>
+          <span class="top-bar__sep">·</span>
+          <span class="top-bar__label">Period</span>
+          <span id="periodBadge" class="top-bar__tag top-bar__tag--period">Name period</span>
+        </div>
+        <div class="top-bar__right">
+          <span id="savePill" class="save-dot" title="Auto-save ready"></span>
+          <span id="statePill" class="state-pill">Paused</span>
         </div>
       </header>
 
-      <main class="layout">
-        <section class="panel clock-panel" aria-labelledby="clockTitle">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Live clock</p>
-              <h2 id="clockTitle">Elapsed match time</h2>
-            </div>
-            <span id="periodBadge" class="panel-badge">First Half</span>
-          </div>
-
+      <main class="main-grid">
+        <section class="col-clock" aria-label="Clock">
           <div class="clock-wrap">
             <div id="clockDisplay" class="clock-display" aria-live="polite">00:00:00</div>
-            <p id="liveStatus" class="panel-note">Ready for your first task.</p>
           </div>
+          <p id="liveStatus" class="live-status">Press Play to name and start the activity.</p>
 
-          <div class="active-strip" aria-label="Current activity">
-            <article class="active-chip">
-              <span class="active-chip__label">Activity</span>
-              <strong id="activityBadge" class="active-chip__value">Activity</strong>
-            </article>
-            <article class="active-chip">
-              <span class="active-chip__label">Task</span>
-              <strong id="taskBadge" class="active-chip__value">No active task</strong>
-            </article>
-            <article class="active-chip">
-              <span class="active-chip__label">BIP</span>
-              <strong id="bipBadge" class="active-chip__value">No active BIP</strong>
-            </article>
-          </div>
-
-          <div class="control-block">
-            <p class="control-block__label">Clock</p>
-            <div class="control-strip control-strip--two" aria-label="Clock controls">
-              <button id="playBtn" class="control-button control-button--play" type="button">
-                <span class="control-button__label">Play</span>
-                <span class="control-button__meta">Start or resume the match clock</span>
-              </button>
-              <button id="pauseBtn" class="control-button control-button--pause" type="button">
-                <span class="control-button__label">Pause</span>
-                <span class="control-button__meta">Freeze the clock without losing the task map</span>
-              </button>
+          <div class="active-badges">
+            <div class="badge badge--task">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                <path d="M3 1v14h1.5V9h7L9.5 6.5 11.5 4H4.5V1z" />
+              </svg>
+              <span id="taskBadge">No active task</span>
+            </div>
+            <div class="badge badge--bip">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                <circle cx="8" cy="8" r="5.5" />
+              </svg>
+              <span id="bipBadge">No active BIP</span>
             </div>
           </div>
 
-          <div class="control-block">
-            <p class="control-block__label">Annotations</p>
-            <div class="control-strip control-strip--three" aria-label="Annotation controls">
-              <button id="taskBtn" class="control-button control-button--task" type="button">
-                <span id="taskBtnLabel" class="control-button__label">Start Task</span>
-                <span id="taskBtnMeta" class="control-button__meta">
-                  Open a task using the task name field
-                </span>
-              </button>
-              <button id="bipBtn" class="control-button control-button--bip" type="button">
-                <span id="bipBtnLabel" class="control-button__label">Start BIP</span>
-                <span id="bipBtnMeta" class="control-button__meta">
-                  Add a nested ball-in-play interval inside the active task
-                </span>
-              </button>
-              <button id="ruckBtn" class="control-button control-button--ruck" type="button">
-                <span class="control-button__label">Ruck</span>
-                <span class="control-button__meta">Mark a point event on the active task</span>
-              </button>
-            </div>
+          <div class="mini-stats">
+            <div class="stat"><strong id="taskCount">0</strong><span>tasks</span></div>
+            <div class="stat"><strong id="bipCount">0</strong><span>BIPs</span></div>
+            <div class="stat"><strong id="ruckCount">0</strong><span>rucks</span></div>
+            <div class="stat"><strong id="eventCount">0</strong><span>events</span></div>
           </div>
         </section>
 
-        <aside class="panel session-panel" aria-labelledby="sessionTitle">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Session</p>
-              <h2 id="sessionTitle">Activity details</h2>
-            </div>
+        <section class="col-actions" aria-label="Controls">
+          <div class="action-row">
+            <button id="playBtn" class="action-btn action-btn--play" type="button" aria-label="Play">
+              <span class="action-btn__icon">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+                  <path d="M7 4v16l13-8z" />
+                </svg>
+              </span>
+            </button>
+            <button id="pauseBtn" class="action-btn action-btn--pause" type="button" aria-label="Pause">
+              <span class="action-btn__icon">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              </span>
+            </button>
           </div>
+          <div class="action-row">
+            <button id="taskBtn" class="action-btn action-btn--task" type="button" aria-label="Task">
+              <span id="taskBtnIcon" class="action-btn__icon"></span>
+              <span id="taskBtnLabel" class="action-btn__text">T+</span>
+            </button>
+            <button id="bipBtn" class="action-btn action-btn--bip" type="button" aria-label="BIP">
+              <span id="bipBtnIcon" class="action-btn__icon"></span>
+              <span id="bipBtnLabel" class="action-btn__text">BIP</span>
+            </button>
+            <button id="ruckBtn" class="action-btn action-btn--ruck" type="button" aria-label="Ruck">
+              <span class="action-btn__text">R</span>
+            </button>
+          </div>
+        </section>
 
-          <label class="field" for="activityNameInput">
-            <span class="field__label">Activity name</span>
-            <input
-              id="activityNameInput"
-              name="activity"
-              type="text"
-              maxlength="64"
-              autocomplete="off"
-              placeholder="Warm Up Block"
-            />
-          </label>
-
-          <label class="field" for="periodInput">
-            <span class="field__label">Period name</span>
+        <section class="col-inputs" aria-label="Editors">
+          <label class="field-block field-block--period" for="periodInput">
+            <span class="field-block__top">
+              <span class="field-block__label">Period</span>
+              <span class="field-block__hint">Name the live period whenever it changes.</span>
+            </span>
             <input
               id="periodInput"
               name="period"
               type="text"
               maxlength="48"
               autocomplete="off"
-              placeholder="First Half"
+              placeholder="e.g. First Half"
             />
           </label>
 
-          <label class="field" for="taskNameInput">
-            <span class="field__label">Next task name</span>
+          <section class="field-block field-block--task-flow" aria-label="Task workflow">
+            <span class="field-block__top">
+              <span class="field-block__label">Task workflow</span>
+              <span class="field-block__hint">
+                Press T+ to create Task 1, Task 2, and so on. Rename it after creation from the selected task editor.
+              </span>
+            </span>
+          </section>
+
+          <section id="selectedTaskPanel" class="selected-task-panel" aria-label="Selected task" hidden>
+            <div class="selected-task-panel__top">
+              <div class="selected-task-panel__head">
+                <p class="selected-task-panel__label">Selected task</p>
+                <strong id="selectedTaskTitle" class="selected-task-panel__title">Task</strong>
+              </div>
+              <span id="selectedTaskState" class="selected-task-panel__state">Selected</span>
+            </div>
+
+            <label class="field-block field-block--selected" for="selectedTaskNameInput">
+              <span class="field-block__top">
+                <span class="field-block__label">Rename selected task</span>
+                <span id="selectedTaskMeta" class="field-block__hint">Click a task on the timeline to edit it.</span>
+              </span>
+              <input
+                id="selectedTaskNameInput"
+                name="selected-task-name"
+                type="text"
+                maxlength="64"
+                autocomplete="off"
+                placeholder="Task name"
+              />
+            </label>
+
+            <div class="selected-task-panel__actions">
+              <button id="selectedTaskActionBtn" class="aux-btn aux-btn--primary" type="button">
+                Start selected
+              </button>
+              <button id="clearTaskSelectionBtn" class="aux-btn" type="button">Clear</button>
+            </div>
+          </section>
+
+          <div class="export-row">
+            <button id="exportCsvBtn" class="export-btn" type="button" title="Export CSV">
+              <svg
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M10 3v9m-4-3l4 4 4-4M3 15v2h14v-2" />
+              </svg>
+              CSV
+            </button>
+            <button id="exportJsonBtn" class="export-btn" type="button" title="Export JSON">
+              <svg
+                viewBox="0 0 20 20"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M10 3v9m-4-3l4 4 4-4M3 15v2h14v-2" />
+              </svg>
+              JSON
+            </button>
+            <button id="resetBtn" class="export-btn export-btn--danger" type="button" title="Reset session">
+              <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M4 5h12M8 3h4M6 5l1 11h6l1-11M9 8v5m2-5v5" />
+              </svg>
+            </button>
+          </div>
+          <div class="finish-row">
+            <button id="newActivityBtn" class="new-activity-btn" type="button">New activity</button>
+            <button id="finishBtn" class="finish-btn" type="button">Finish activity</button>
+          </div>
+        </section>
+      </main>
+
+      <section class="timeline-strip" aria-label="Session timeline">
+        <div class="timeline-workbench">
+          <div id="timelineScale" class="timeline-scale" aria-hidden="true"></div>
+          <div id="timelineEmpty" class="empty-state">
+            <p>Press Play, name the activity, then add tasks. Period stays editable during the activity.</p>
+          </div>
+          <div id="timelineMap" class="timeline-map" role="list"></div>
+        </div>
+      </section>
+
+      <div class="log-drawer" id="logDrawer">
+        <button id="logToggle" class="log-toggle" type="button" aria-expanded="false">
+          <svg
+            class="log-toggle__chevron"
+            viewBox="0 0 20 20"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 13l5-5 5 5" />
+          </svg>
+          <span id="logToggleLabel">Events</span>
+          <span id="logToggleCount" class="log-toggle__count">0</span>
+        </button>
+        <div id="logContent" class="log-content" hidden>
+          <div id="eventsEmptyState" class="empty-state empty-state--mini"><p>No events yet</p></div>
+          <div id="eventsList" class="event-list" role="list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="activityModal" class="activity-modal" hidden>
+      <div class="activity-modal__backdrop"></div>
+      <div class="activity-modal__card" role="dialog" aria-modal="true" aria-labelledby="activityModalTitle">
+        <p class="activity-modal__eyebrow">Start activity</p>
+        <h2 id="activityModalTitle" class="activity-modal__title">Name the activity once</h2>
+        <p class="activity-modal__copy">
+          This name locks in for the session when you start the clock.
+        </p>
+        <form id="activityForm" class="activity-modal__form">
+          <label class="field-block field-block--activity" for="activityModalInput">
+            <span class="field-block__top">
+              <span class="field-block__label">Activity name</span>
+              <span class="field-block__hint">Example: U18 Match vs Dragons</span>
+            </span>
             <input
-              id="taskNameInput"
-              name="task-name"
+              id="activityModalInput"
+              name="activity"
               type="text"
               maxlength="64"
               autocomplete="off"
-              placeholder="Kick Return Drill"
+              placeholder="Type activity name"
             />
           </label>
-
-          <div class="metrics-grid" aria-label="Session summary">
-            <article class="metric-card">
-              <span class="metric-card__label">Tasks</span>
-              <strong id="taskCount" class="metric-card__value">0</strong>
-            </article>
-            <article class="metric-card">
-              <span class="metric-card__label">BIPs</span>
-              <strong id="bipCount" class="metric-card__value">0</strong>
-            </article>
-            <article class="metric-card">
-              <span class="metric-card__label">Rucks</span>
-              <strong id="ruckCount" class="metric-card__value">0</strong>
-            </article>
-            <article class="metric-card">
-              <span class="metric-card__label">Events logged</span>
-              <strong id="eventCount" class="metric-card__value">0</strong>
-            </article>
-            <article class="metric-card">
-              <span class="metric-card__label">Session started</span>
-              <strong id="sessionStarted" class="metric-card__value metric-card__value--small">
-                Not started
-              </strong>
-            </article>
-            <article class="metric-card">
-              <span class="metric-card__label">Last event</span>
-              <strong id="lastEvent" class="metric-card__value metric-card__value--small">
-                None yet
-              </strong>
-            </article>
+          <p id="activityModalError" class="activity-modal__error" hidden>Enter a name to start the activity.</p>
+          <div class="activity-modal__actions">
+            <button id="activityCancelBtn" class="modal-btn" type="button">Cancel</button>
+            <button id="activityStartBtn" class="modal-btn modal-btn--primary" type="submit">Start activity</button>
           </div>
-
-          <div class="secondary-actions">
-            <button id="exportCsvBtn" class="secondary-button" type="button">Export CSV</button>
-            <button id="exportJsonBtn" class="secondary-button" type="button">Export JSON</button>
-            <button id="resetBtn" class="secondary-button secondary-button--danger" type="button">
-              Reset session
-            </button>
-          </div>
-
-          <p class="download-note">
-            Export files start with the activity name and download to the device's normal
-            Downloads location.
-          </p>
-        </aside>
-
-        <section class="panel timeline-panel" aria-labelledby="timelineTitle">
-          <div class="panel-heading panel-heading--timeline">
-            <div>
-              <p class="eyebrow">Visualization</p>
-              <h2 id="timelineTitle">Task map</h2>
-            </div>
-            <p class="panel-note panel-note--tight">
-              Tap a task, BIP bar, or ruck marker to inspect it and verify nesting.
-            </p>
-          </div>
-
-          <div class="timeline-layout">
-            <div class="timeline-workbench">
-              <div id="timelineScale" class="timeline-scale" aria-hidden="true"></div>
-
-              <div id="timelineEmpty" class="empty-state">
-                <p class="empty-state__title">No tasks yet</p>
-                <p class="empty-state__text">
-                  Start the clock, open a task, then add BIP intervals inside that task to build
-                  the visualization.
-                </p>
-              </div>
-
-              <div id="timelineMap" class="timeline-map" role="list"></div>
-            </div>
-
-            <aside class="selection-card" aria-labelledby="selectionTitle">
-              <p class="eyebrow">Selection</p>
-              <h3 id="selectionTitle" class="selection-card__title">Session overview</h3>
-              <p id="selectionMeta" class="selection-meta">No task selected yet.</p>
-              <p id="selectionSummary" class="selection-summary">
-                Start the clock and open a task to create a nested BIP structure.
-              </p>
-
-              <dl class="selection-grid">
-                <div class="selection-item">
-                  <dt>Activity</dt>
-                  <dd id="selectionActivity">Activity</dd>
-                </div>
-                <div class="selection-item">
-                  <dt>Period</dt>
-                  <dd id="selectionPeriod">-</dd>
-                </div>
-                <div class="selection-item">
-                  <dt>Timing</dt>
-                  <dd id="selectionTiming">-</dd>
-                </div>
-                <div class="selection-item">
-                  <dt>Duration</dt>
-                  <dd id="selectionDuration">-</dd>
-                </div>
-                <div class="selection-item selection-item--wide">
-                  <dt>Context</dt>
-                  <dd id="selectionContext">-</dd>
-                </div>
-              </dl>
-            </aside>
-          </div>
-        </section>
-
-        <section class="panel log-panel" aria-labelledby="logTitle">
-          <div class="panel-heading panel-heading--log">
-            <div>
-              <p class="eyebrow">Event log</p>
-              <h2 id="logTitle">Event stream</h2>
-            </div>
-            <p class="panel-note panel-note--tight">
-              Every state change stays in the export, including task start or end and nested BIP
-              transitions.
-            </p>
-          </div>
-
-          <div class="log-head" aria-hidden="true">
-            <span>Event</span>
-            <span>Type</span>
-            <span>Context</span>
-            <span>Elapsed</span>
-            <span>Created</span>
-          </div>
-
-          <div id="eventsEmptyState" class="empty-state">
-            <p class="empty-state__title">No events yet</p>
-            <p class="empty-state__text">
-              Press <strong>Play</strong>, start a task, and the event stream will populate
-              automatically.
-            </p>
-          </div>
-
-          <div id="eventsList" class="event-list" role="list"></div>
-        </section>
-      </main>
+        </form>
+      </div>
     </div>
 
     <div id="srStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260404-8"></script>
   </body>
 </html>

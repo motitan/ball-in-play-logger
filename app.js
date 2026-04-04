@@ -1,13 +1,17 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
-  const DEFAULT_PERIOD = "First Half";
-  const DEFAULT_ACTIVITY_NAME = "Activity";
+  const DEFAULT_PERIOD = "";
+  const DEFAULT_ACTIVITY = "Activity";
+  const PROMPT_ACTIVITY = "Start activity";
+  const PROMPT_PERIOD = "Name period";
+  const EXPORT_PERIOD = "Untitled Period";
   const CLOCK_TICK_MS = 250;
-  const MAX_PERIOD_LENGTH = 48;
-  const MAX_ACTIVITY_LENGTH = 64;
-  const MAX_TASK_LENGTH = 64;
 
-  const eventTypeLabels = {
+  const MAX_ACTIVITY = 64;
+  const MAX_PERIOD = 48;
+  const MAX_TASK = 64;
+
+  const EVENT_LABELS = {
     play: "Play",
     pause: "Pause",
     task_start: "Task Start",
@@ -17,12 +21,14 @@
     ruck: "Ruck",
   };
 
-  const elements = {
-    activityNameInput: document.getElementById("activityNameInput"),
-    taskNameInput: document.getElementById("taskNameInput"),
-    periodInput: document.getElementById("periodInput"),
-    periodBadge: document.getElementById("periodBadge"),
+  const ICON_TASK_ADD = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+  const ICON_TASK_STOP = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>`;
+  const ICON_BIP_START = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>`;
+  const ICON_BIP_STOP = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>`;
+
+  const el = {
     activityBadge: document.getElementById("activityBadge"),
+    periodBadge: document.getElementById("periodBadge"),
     taskBadge: document.getElementById("taskBadge"),
     bipBadge: document.getElementById("bipBadge"),
     clockDisplay: document.getElementById("clockDisplay"),
@@ -33,115 +39,139 @@
     pauseBtn: document.getElementById("pauseBtn"),
     taskBtn: document.getElementById("taskBtn"),
     taskBtnLabel: document.getElementById("taskBtnLabel"),
-    taskBtnMeta: document.getElementById("taskBtnMeta"),
+    taskBtnIcon: document.getElementById("taskBtnIcon"),
     bipBtn: document.getElementById("bipBtn"),
     bipBtnLabel: document.getElementById("bipBtnLabel"),
-    bipBtnMeta: document.getElementById("bipBtnMeta"),
+    bipBtnIcon: document.getElementById("bipBtnIcon"),
     ruckBtn: document.getElementById("ruckBtn"),
+    periodInput: document.getElementById("periodInput"),
+    selectedTaskPanel: document.getElementById("selectedTaskPanel"),
+    selectedTaskTitle: document.getElementById("selectedTaskTitle"),
+    selectedTaskState: document.getElementById("selectedTaskState"),
+    selectedTaskMeta: document.getElementById("selectedTaskMeta"),
+    selectedTaskNameInput: document.getElementById("selectedTaskNameInput"),
+    selectedTaskActionBtn: document.getElementById("selectedTaskActionBtn"),
+    clearTaskSelectionBtn: document.getElementById("clearTaskSelectionBtn"),
     exportCsvBtn: document.getElementById("exportCsvBtn"),
     exportJsonBtn: document.getElementById("exportJsonBtn"),
     resetBtn: document.getElementById("resetBtn"),
-    eventCount: document.getElementById("eventCount"),
+    newActivityBtn: document.getElementById("newActivityBtn"),
+    finishBtn: document.getElementById("finishBtn"),
     taskCount: document.getElementById("taskCount"),
     bipCount: document.getElementById("bipCount"),
     ruckCount: document.getElementById("ruckCount"),
-    sessionStarted: document.getElementById("sessionStarted"),
-    lastEvent: document.getElementById("lastEvent"),
+    eventCount: document.getElementById("eventCount"),
     timelineScale: document.getElementById("timelineScale"),
     timelineMap: document.getElementById("timelineMap"),
     timelineEmpty: document.getElementById("timelineEmpty"),
-    selectionTitle: document.getElementById("selectionTitle"),
-    selectionMeta: document.getElementById("selectionMeta"),
-    selectionSummary: document.getElementById("selectionSummary"),
-    selectionActivity: document.getElementById("selectionActivity"),
-    selectionPeriod: document.getElementById("selectionPeriod"),
-    selectionTiming: document.getElementById("selectionTiming"),
-    selectionDuration: document.getElementById("selectionDuration"),
-    selectionContext: document.getElementById("selectionContext"),
+    logToggle: document.getElementById("logToggle"),
+    logToggleCount: document.getElementById("logToggleCount"),
+    logContent: document.getElementById("logContent"),
+    logDrawer: document.getElementById("logDrawer"),
     eventsEmptyState: document.getElementById("eventsEmptyState"),
     eventsList: document.getElementById("eventsList"),
+    activityModal: document.getElementById("activityModal"),
+    activityForm: document.getElementById("activityForm"),
+    activityModalInput: document.getElementById("activityModalInput"),
+    activityModalError: document.getElementById("activityModalError"),
+    activityCancelBtn: document.getElementById("activityCancelBtn"),
     srStatus: document.getElementById("srStatus"),
   };
 
-  const saveState = {
-    available: true,
-    lastSavedAt: null,
-  };
-
+  const saveState = { available: true, lastSavedAt: null };
   let session = loadSession();
   let tickTimer = null;
-  let selectedEntity = { type: "session" };
+  let pendingPlayAfterNaming = false;
+  let selectionCleared = false;
+  let selectedTaskId = session.activeTaskId || session.tasks.at(-1)?.id || null;
+  let finishConfirmExpiresAt = 0;
+  let finishConfirmTimer = null;
+  const zipEncoder = new TextEncoder();
+  const crcTable = buildCrcTable();
 
   bindEvents();
   renderAll();
   syncClockTimer();
-  announce(session.events.length ? "Session restored from this device." : "Logger ready.");
+  announce(session.events.length ? "Session restored." : "Logger ready.");
 
   function bindEvents() {
-    elements.activityNameInput.addEventListener("input", handleActivityInput);
-    elements.periodInput.addEventListener("input", handlePeriodInput);
-    elements.taskNameInput.addEventListener("input", handleTaskNameInput);
-    elements.playBtn.addEventListener("click", () => handleClockAction("play"));
-    elements.pauseBtn.addEventListener("click", () => handleClockAction("pause"));
-    elements.taskBtn.addEventListener("click", toggleTask);
-    elements.bipBtn.addEventListener("click", toggleBip);
-    elements.ruckBtn.addEventListener("click", addRuck);
-    elements.exportCsvBtn.addEventListener("click", exportCsv);
-    elements.exportJsonBtn.addEventListener("click", exportJson);
-    elements.resetBtn.addEventListener("click", resetSession);
-    elements.timelineMap.addEventListener("click", handleTimelineSelection);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    el.playBtn.addEventListener("click", handlePlayIntent);
+    el.pauseBtn.addEventListener("click", handlePauseIntent);
+    el.taskBtn.addEventListener("click", handlePrimaryTaskAction);
+    el.bipBtn.addEventListener("click", toggleBip);
+    el.ruckBtn.addEventListener("click", addRuck);
+    el.periodInput.addEventListener("input", handlePeriodInput);
+    el.selectedTaskNameInput.addEventListener("input", handleSelectedTaskRename);
+    el.selectedTaskActionBtn.addEventListener("click", handleSelectedTaskAction);
+    el.clearTaskSelectionBtn.addEventListener("click", clearTaskSelection);
+    el.exportCsvBtn.addEventListener("click", exportCsv);
+    el.exportJsonBtn.addEventListener("click", exportJson);
+    el.resetBtn.addEventListener("click", resetSession);
+    el.newActivityBtn.addEventListener("click", handleNewActivityIntent);
+    el.finishBtn.addEventListener("click", handleFinishIntent);
+    el.logToggle.addEventListener("click", toggleLogDrawer);
+    el.timelineMap.addEventListener("click", handleTimelineClick);
+    el.activityForm.addEventListener("submit", handleActivitySubmit);
+    el.activityCancelBtn.addEventListener("click", closeActivityModal);
+    document.addEventListener("keydown", handleKeydown);
+    document.addEventListener("visibilitychange", () => {
+      renderClock();
+      if (!document.hidden) announce("View refreshed.");
+    });
   }
 
-  function handleVisibilityChange() {
-    renderClock();
-    if (!document.hidden) {
-      announce("Session view refreshed.");
+  function handleKeydown(event) {
+    if (event.key === "Escape" && !el.activityModal.hidden) {
+      closeActivityModal();
     }
   }
 
-  function handleActivityInput(event) {
-    session.activityName = String(event.target.value || "").slice(0, MAX_ACTIVITY_LENGTH);
-    persistSession("Activity name updated.");
-    renderAll();
-  }
-
   function handlePeriodInput(event) {
-    session.currentPeriod = String(event.target.value || "").slice(0, MAX_PERIOD_LENGTH);
+    session.currentPeriod = String(event.target.value || "").slice(0, MAX_PERIOD);
     persistSession("Period updated.");
     renderAll();
   }
 
-  function handleTaskNameInput(event) {
-    session.taskNameDraft = String(event.target.value || "").slice(0, MAX_TASK_LENGTH);
-    persistSession("Task name updated.");
-    renderAll();
-  }
-
-  function handleClockAction(actionType) {
-    if (actionType === "play" && session.clockState === "running") {
-      announce("Play ignored because the clock is already running.");
+  function handleSelectedTaskRename(event) {
+    const task = getSelectedTaskFromSession();
+    if (!task) {
       return;
     }
 
-    if (actionType === "pause" && session.clockState === "paused") {
-      announce("Pause ignored because the clock is already paused.");
+    task.name = taskLabel(event.target.value, getTaskOrdinal(task.id));
+    persistSession(`Task renamed: ${task.name}.`);
+    renderAll();
+  }
+
+  function handlePlayIntent() {
+    if (session.isFinished) {
+      return;
+    }
+
+    if (session.clockState === "running") {
+      return;
+    }
+
+    if (!hasValue(session.activityName)) {
+      pendingPlayAfterNaming = true;
+      openActivityModal();
+      return;
+    }
+
+    startClock();
+  }
+
+  function handlePauseIntent() {
+    if (session.isFinished) {
+      return;
+    }
+
+    if (session.clockState !== "running") {
       return;
     }
 
     const now = new Date();
     const elapsedMs = getCurrentElapsedMs(now);
-
-    if (actionType === "play") {
-      appendEvent("play", elapsedMs, now);
-      session.clockState = "running";
-      session.lastStartedAt = now.toISOString();
-      persistSession("Play logged.");
-      syncClockTimer();
-      renderAll();
-      return;
-    }
-
     session.elapsedMs = elapsedMs;
     session.clockState = "paused";
     session.lastStartedAt = null;
@@ -151,27 +181,111 @@
     renderAll();
   }
 
-  function toggleTask() {
+  function startClock() {
+    const now = new Date();
+    const elapsedMs = getCurrentElapsedMs(now);
+    appendEvent("play", elapsedMs, now);
+    session.clockState = "running";
+    session.lastStartedAt = now.toISOString();
+    persistSession("Play logged.");
+    syncClockTimer();
+    renderAll();
+  }
+
+  function handleActivitySubmit(event) {
+    event.preventDefault();
+    const value = String(el.activityModalInput.value || "").trim().slice(0, MAX_ACTIVITY);
+
+    if (!value) {
+      el.activityModalError.hidden = false;
+      el.activityModalInput.focus();
+      return;
+    }
+
+    session.activityName = value;
+    persistSession("Activity locked.");
+    closeActivityModal(false);
+    renderAll();
+
+    if (pendingPlayAfterNaming) {
+      pendingPlayAfterNaming = false;
+      startClock();
+    }
+  }
+
+  function openActivityModal() {
+    el.activityModal.hidden = false;
+    el.activityModalError.hidden = true;
+    el.activityModalInput.value = session.activityName;
+    window.requestAnimationFrame(() => {
+      el.activityModalInput.focus();
+      el.activityModalInput.select();
+    });
+  }
+
+  function closeActivityModal(resetPendingPlay = true) {
+    el.activityModal.hidden = true;
+    el.activityModalError.hidden = true;
+    if (resetPendingPlay) {
+      pendingPlayAfterNaming = false;
+    }
+  }
+
+  function handlePrimaryTaskAction() {
+    if (session.isFinished) {
+      return;
+    }
+
     const activeTask = getActiveTask();
-    if (!activeTask && session.clockState !== "running") {
+
+    if (activeTask) {
+      stopTask(activeTask);
+      return;
+    }
+
+    if (session.clockState !== "running") {
       announce("Start the clock before creating a task.");
       return;
     }
 
-    const now = new Date();
-    const elapsedMs = getCurrentElapsedMs(now);
+    startTask();
+  }
 
-    if (activeTask) {
-      endTask(activeTask, elapsedMs, now);
-      persistSession(`Task ended: ${activeTask.name}.`);
-      renderAll();
+  function handleSelectedTaskAction() {
+    if (session.isFinished) {
       return;
     }
 
+    const selectedTask = getSelectedTaskFromSession();
+    if (!selectedTask) {
+      return;
+    }
+
+    if (session.activeTaskId === selectedTask.id) {
+      stopTask(selectedTask);
+      return;
+    }
+
+    if (session.activeTaskId) {
+      announce("Stop the live task before starting another.");
+      return;
+    }
+
+    if (session.clockState !== "running") {
+      announce("Start the clock before starting a task.");
+      return;
+    }
+
+    startTask(selectedTask.name);
+  }
+
+  function startTask(name = "") {
+    const now = new Date();
+    const elapsedMs = getCurrentElapsedMs(now);
     const task = {
       id: createId(),
-      name: getNextTaskName(),
-      period: getPeriodLabel(session.currentPeriod),
+      name: taskLabel(name, session.tasks.length + 1),
+      period: exportPeriodLabel(session.currentPeriod),
       startElapsedMs: elapsedMs,
       endElapsedMs: null,
       createdAt: now.toISOString(),
@@ -183,17 +297,20 @@
     session.tasks.push(task);
     session.activeTaskId = task.id;
     session.taskNameDraft = "";
+    setSelectedTask(task.id);
     appendEvent("task_start", elapsedMs, now, {
       taskId: task.id,
       taskName: task.name,
       label: `Start ${task.name}`,
     });
-    selectedEntity = { type: "task", taskId: task.id };
     persistSession(`Task started: ${task.name}.`);
     renderAll();
   }
 
-  function endTask(task, elapsedMs, now) {
+  function stopTask(task) {
+    const now = new Date();
+    const elapsedMs = getCurrentElapsedMs(now);
+
     if (session.activeBipId) {
       const activeBip = getActiveBip();
       if (activeBip) {
@@ -209,19 +326,25 @@
       taskName: task.name,
       label: `End ${task.name}`,
     });
-    selectedEntity = { type: "task", taskId: task.id };
+    setSelectedTask(task.id);
+    persistSession(`Task ended: ${task.name}.`);
+    renderAll();
   }
 
   function toggleBip() {
+    if (session.isFinished) {
+      return;
+    }
+
     const task = getActiveTask();
     if (!task) {
-      announce("Open a task before starting a BIP interval.");
+      announce("Start a task before adding BIP.");
       return;
     }
 
     const activeBip = getActiveBip();
     if (!activeBip && session.clockState !== "running") {
-      announce("Start the clock before creating a BIP interval.");
+      announce("Start the clock first.");
       return;
     }
 
@@ -238,7 +361,7 @@
     const bip = {
       id: createId(),
       label: `BIP ${task.bips.length + 1}`,
-      period: getPeriodLabel(session.currentPeriod),
+      period: exportPeriodLabel(session.currentPeriod),
       startElapsedMs: elapsedMs,
       endElapsedMs: null,
       createdAt: now.toISOString(),
@@ -254,12 +377,11 @@
       bipName: bip.label,
       label: `Start ${bip.label}`,
     });
-    selectedEntity = { type: "bip", taskId: task.id, bipId: bip.id };
     persistSession(`BIP started inside ${task.name}.`);
     renderAll();
   }
 
-  function endBip(bip, task, elapsedMs, now, isTaskCascade = false) {
+  function endBip(bip, task, elapsedMs, now, isCascade = false) {
     bip.endElapsedMs = elapsedMs;
     bip.closedAt = now.toISOString();
     session.activeBipId = null;
@@ -270,22 +392,25 @@
       bipName: bip.label,
       label: `End ${bip.label}`,
     });
-    selectedEntity = { type: "bip", taskId: task.id, bipId: bip.id };
 
-    if (!isTaskCascade) {
+    if (!isCascade) {
       announce(`BIP ended inside ${task.name}.`);
     }
   }
 
   function addRuck() {
+    if (session.isFinished) {
+      return;
+    }
+
     if (session.clockState !== "running") {
-      announce("Start the clock before adding a ruck event.");
+      announce("Start the clock first.");
       return;
     }
 
     const task = getActiveTask();
     if (!task) {
-      announce("Open a task before adding a ruck event.");
+      announce("Start a task before adding a ruck.");
       return;
     }
 
@@ -293,7 +418,7 @@
     const elapsedMs = getCurrentElapsedMs(now);
     const ruck = {
       id: createId(),
-      period: getPeriodLabel(session.currentPeriod),
+      period: exportPeriodLabel(session.currentPeriod),
       elapsedMs: Math.max(0, Math.round(elapsedMs)),
       createdAt: now.toISOString(),
       bipId: session.activeBipId || null,
@@ -307,45 +432,183 @@
       bipName: getBipName(task, ruck.bipId),
       label: "Ruck",
     });
-    selectedEntity = { type: "ruck", taskId: task.id, ruckId: ruck.id };
     persistSession(`Ruck added to ${task.name}.`);
     renderAll();
   }
 
-  function handleTimelineSelection(event) {
-    const target = event.target.closest("[data-entity-type]");
+  function handleTimelineClick(event) {
+    const target = event.target.closest("[data-task-id]");
     if (!target) {
       return;
     }
 
-    selectedEntity = {
-      type: target.dataset.entityType,
-      taskId: target.dataset.taskId || null,
-      bipId: target.dataset.bipId || null,
-      ruckId: target.dataset.ruckId || null,
-    };
-
+    setSelectedTask(target.dataset.taskId);
     renderAll();
   }
 
-  function resetSession() {
-    const confirmed = window.confirm(
-      "Reset this session? This clears the task map and event log from the browser."
-    );
+  function setSelectedTask(taskId) {
+    selectedTaskId = taskId;
+    selectionCleared = false;
+  }
 
-    if (!confirmed) {
+  function clearTaskSelection() {
+    selectedTaskId = null;
+    selectionCleared = true;
+    renderAll();
+  }
+
+  function toggleLogDrawer() {
+    const opening = el.logContent.hidden;
+    el.logContent.hidden = !opening;
+    el.logToggle.setAttribute("aria-expanded", String(opening));
+    el.logDrawer.classList.toggle("log-drawer--open", opening);
+  }
+
+  function resetSession() {
+    if (!window.confirm("Reset this session? All data will be cleared from the browser.")) {
       return;
     }
 
     session = createSession();
-    selectedEntity = { type: "session" };
+    selectedTaskId = null;
+    selectionCleared = false;
+    pendingPlayAfterNaming = false;
+    clearFinishConfirm(false);
+    closeActivityModal();
     persistSession("Session reset.");
     syncClockTimer();
     renderAll();
   }
 
+  function handleNewActivityIntent() {
+    if (!session.isFinished && sessionHasProgress()) {
+      const confirmed = window.confirm(
+        "Start a new activity? This clears the current one. Finish or export it first if you need to keep its files."
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    startNewActivity();
+  }
+
+  function startNewActivity() {
+    session = createSession();
+    selectedTaskId = null;
+    selectionCleared = false;
+    pendingPlayAfterNaming = true;
+    clearFinishConfirm(false);
+    closeActivityModal(false);
+    persistSession("New activity ready.");
+    syncClockTimer();
+    renderAll();
+    openActivityModal();
+  }
+
+  function handleFinishIntent() {
+    if (session.isFinished) {
+      return;
+    }
+
+    if (!hasValue(session.activityName)) {
+      announce("Start the activity before finishing it.");
+      return;
+    }
+
+    if (!isFinishConfirmArmed()) {
+      armFinishConfirm();
+      announce("Press Finish activity again, then confirm.");
+      renderAll();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Finish this activity? This will stop the session, close any live task or BIP, lock the logger, and download a ZIP with both CSV and JSON files."
+    );
+
+    if (!confirmed) {
+      clearFinishConfirm();
+      return;
+    }
+
+    finalizeActivity();
+  }
+
+  function finalizeActivity() {
+    const now = new Date();
+    const elapsedMs = getCurrentElapsedMs(now);
+    const activeTask = getActiveTask();
+
+    if (session.activeBipId && activeTask) {
+      const activeBip = getActiveBip();
+      if (activeBip) {
+        endBip(activeBip, activeTask, elapsedMs, now, true);
+      }
+    }
+
+    if (activeTask) {
+      activeTask.endElapsedMs = elapsedMs;
+      activeTask.closedAt = now.toISOString();
+      session.activeTaskId = null;
+      appendEvent("task_end", elapsedMs, now, {
+        taskId: activeTask.id,
+        taskName: activeTask.name,
+        label: `End ${activeTask.name}`,
+      });
+    }
+
+    if (session.clockState === "running") {
+      appendEvent("pause", elapsedMs, now);
+    }
+
+    session.elapsedMs = elapsedMs;
+    session.clockState = "paused";
+    session.lastStartedAt = null;
+    session.activeBipId = null;
+    session.isFinished = true;
+    session.finishedAt = now.toISOString();
+
+    clearFinishConfirm(false);
+    persistSession("Activity finished.");
+    syncClockTimer();
+    renderAll();
+    exportBundleZip();
+    announce("Activity finished and ZIP downloaded.");
+  }
+
   function exportCsv() {
     const snapshot = getExportSnapshot();
+    triggerDownload(
+      `${buildFilenameBase(snapshot.activityName, snapshot.exportedAt)}.csv`,
+      buildCsvContent(snapshot),
+      "text/csv;charset=utf-8"
+    );
+    announce("CSV exported.");
+  }
+
+  function exportJson() {
+    const snapshot = getExportSnapshot();
+    triggerDownload(
+      `${buildFilenameBase(snapshot.activityName, snapshot.exportedAt)}.json`,
+      buildJsonContent(snapshot),
+      "application/json;charset=utf-8"
+    );
+    announce("JSON exported.");
+  }
+
+  function exportBundleZip() {
+    const snapshot = getExportSnapshot();
+    const base = buildFilenameBase(snapshot.activityName, snapshot.exportedAt);
+    const zipBlob = buildZipBlob(base, [
+      { name: `${base}.csv`, bytes: zipEncoder.encode(buildCsvContent(snapshot)) },
+      { name: `${base}.json`, bytes: zipEncoder.encode(buildJsonContent(snapshot)) },
+    ]);
+    triggerBlobDownload(`${base}.zip`, zipBlob);
+  }
+
+  function buildCsvContent(snapshot) {
     const headers = [
       "session_id",
       "activity_name",
@@ -363,38 +626,21 @@
       "event_elapsed_ms",
       "created_at",
     ];
-
     const rows = buildCsvRows(snapshot).map((row) => headers.map((header) => row[header] ?? ""));
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
-
-    triggerDownload(
-      `${buildFilenameBase(snapshot.activityName, snapshot.exportedAt)}.csv`,
-      csv,
-      "text/csv;charset=utf-8"
-    );
-    announce("CSV exported to this device.");
+    return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
   }
 
-  function exportJson() {
-    const snapshot = getExportSnapshot();
-    const json = `${JSON.stringify(snapshot, null, 2)}\n`;
-    triggerDownload(
-      `${buildFilenameBase(snapshot.activityName, snapshot.exportedAt)}.json`,
-      json,
-      "application/json;charset=utf-8"
-    );
-    announce("JSON exported to this device.");
+  function buildJsonContent(snapshot) {
+    return `${JSON.stringify(snapshot, null, 2)}\n`;
   }
 
   function buildCsvRows(snapshot) {
     const rows = [];
+    const base = { session_id: snapshot.sessionId, activity_name: snapshot.activityName };
 
     snapshot.tasks.forEach((task) => {
       rows.push({
-        session_id: snapshot.sessionId,
-        activity_name: snapshot.activityName,
+        ...base,
         record_type: "task",
         event_type: "",
         label: task.name,
@@ -412,8 +658,7 @@
 
       task.bips.forEach((bip) => {
         rows.push({
-          session_id: snapshot.sessionId,
-          activity_name: snapshot.activityName,
+          ...base,
           record_type: "bip",
           event_type: "",
           label: bip.label,
@@ -432,8 +677,7 @@
 
       task.rucks.forEach((ruck) => {
         rows.push({
-          session_id: snapshot.sessionId,
-          activity_name: snapshot.activityName,
+          ...base,
           record_type: "ruck",
           event_type: "ruck",
           label: "Ruck",
@@ -453,8 +697,7 @@
 
     snapshot.events.forEach((eventItem) => {
       rows.push({
-        session_id: snapshot.sessionId,
-        activity_name: snapshot.activityName,
+        ...base,
         record_type: "event",
         event_type: eventItem.type,
         label: eventItem.label,
@@ -475,20 +718,20 @@
   }
 
   function triggerDownload(filename, contents, mimeType) {
-    const blob = new Blob([contents], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    triggerBlobDownload(filename, new Blob([contents], { type: mimeType }));
+  }
 
-    link.href = url;
-    link.download = filename;
-    link.rel = "noopener";
+  function triggerBlobDownload(filename, blob) {
+    const url = URL.createObjectURL(blob);
+    const link = Object.assign(document.createElement("a"), {
+      href: url,
+      download: filename,
+      rel: "noopener",
+    });
     document.body.appendChild(link);
     link.click();
     link.remove();
-
-    window.setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 1000);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function persistSession(message) {
@@ -507,151 +750,11 @@
   function loadSession() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return createSession();
-      }
-
-      return normalizeSession(JSON.parse(raw));
+      return raw ? normalizeSession(JSON.parse(raw)) : createSession();
     } catch (error) {
-      console.error("Unable to load stored session", error);
+      console.error("Unable to load session", error);
       return createSession();
     }
-  }
-
-  function normalizeSession(raw) {
-    const base = createSession();
-
-    if (!raw || typeof raw !== "object") {
-      return base;
-    }
-
-    const nextSession = {
-      sessionId: typeof raw.sessionId === "string" && raw.sessionId ? raw.sessionId : base.sessionId,
-      createdAt: isValidDateString(raw.createdAt) ? raw.createdAt : base.createdAt,
-      activityName:
-        typeof raw.activityName === "string"
-          ? raw.activityName.slice(0, MAX_ACTIVITY_LENGTH)
-          : base.activityName,
-      currentPeriod:
-        typeof raw.currentPeriod === "string"
-          ? raw.currentPeriod.slice(0, MAX_PERIOD_LENGTH)
-          : base.currentPeriod,
-      taskNameDraft:
-        typeof raw.taskNameDraft === "string"
-          ? raw.taskNameDraft.slice(0, MAX_TASK_LENGTH)
-          : base.taskNameDraft,
-      clockState: raw.clockState === "running" ? "running" : "paused",
-      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
-      lastStartedAt: isValidDateString(raw.lastStartedAt) ? raw.lastStartedAt : null,
-      activeTaskId: typeof raw.activeTaskId === "string" ? raw.activeTaskId : null,
-      activeBipId: typeof raw.activeBipId === "string" ? raw.activeBipId : null,
-      tasks: Array.isArray(raw.tasks) ? raw.tasks.map(normalizeTask).filter(Boolean) : [],
-      events: Array.isArray(raw.events)
-        ? raw.events
-            .map(normalizeEvent)
-            .filter(Boolean)
-            .map((eventItem, index) => ({ ...eventItem, index: index + 1 }))
-        : [],
-    };
-
-    if (nextSession.clockState === "paused") {
-      nextSession.lastStartedAt = null;
-    }
-
-    if (nextSession.clockState === "running" && !nextSession.lastStartedAt) {
-      nextSession.clockState = "paused";
-    }
-
-    if (!findTaskById(nextSession.tasks, nextSession.activeTaskId)) {
-      nextSession.activeTaskId = null;
-    }
-
-    if (!findBipById(nextSession.tasks, nextSession.activeBipId)) {
-      nextSession.activeBipId = null;
-    }
-
-    return nextSession;
-  }
-
-  function normalizeTask(raw) {
-    if (!raw || typeof raw !== "object") {
-      return null;
-    }
-
-    const taskId = typeof raw.id === "string" && raw.id ? raw.id : createId();
-
-    return {
-      id: taskId,
-      name: getTaskLabel(raw.name, 1),
-      period: getPeriodLabel(raw.period),
-      startElapsedMs: normalizeElapsedMs(raw.startElapsedMs),
-      endElapsedMs:
-        raw.endElapsedMs === null || raw.endElapsedMs === undefined
-          ? null
-          : normalizeElapsedMs(raw.endElapsedMs),
-      createdAt: isValidDateString(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
-      closedAt: isValidDateString(raw.closedAt) ? raw.closedAt : null,
-      bips: Array.isArray(raw.bips) ? raw.bips.map(normalizeBip).filter(Boolean) : [],
-      rucks: Array.isArray(raw.rucks) ? raw.rucks.map(normalizeRuck).filter(Boolean) : [],
-    };
-  }
-
-  function normalizeBip(raw) {
-    if (!raw || typeof raw !== "object") {
-      return null;
-    }
-
-    return {
-      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
-      label: getBipLabel(raw.label, 1),
-      period: getPeriodLabel(raw.period),
-      startElapsedMs: normalizeElapsedMs(raw.startElapsedMs),
-      endElapsedMs:
-        raw.endElapsedMs === null || raw.endElapsedMs === undefined
-          ? null
-          : normalizeElapsedMs(raw.endElapsedMs),
-      createdAt: isValidDateString(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
-      closedAt: isValidDateString(raw.closedAt) ? raw.closedAt : null,
-    };
-  }
-
-  function normalizeRuck(raw) {
-    if (!raw || typeof raw !== "object") {
-      return null;
-    }
-
-    return {
-      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
-      period: getPeriodLabel(raw.period),
-      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
-      createdAt: isValidDateString(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
-      bipId: typeof raw.bipId === "string" ? raw.bipId : null,
-    };
-  }
-
-  function normalizeEvent(raw) {
-    if (!raw || typeof raw !== "object") {
-      return null;
-    }
-
-    const type = eventTypeLabels[raw.type] ? raw.type : null;
-    if (!type) {
-      return null;
-    }
-
-    return {
-      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
-      index: 0,
-      type,
-      label: getEventLabel(type, raw),
-      period: getPeriodLabel(raw.period),
-      elapsedMs: normalizeElapsedMs(raw.elapsedMs),
-      createdAt: isValidDateString(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
-      taskId: typeof raw.taskId === "string" ? raw.taskId : null,
-      taskName: typeof raw.taskName === "string" ? raw.taskName : "",
-      bipId: typeof raw.bipId === "string" ? raw.bipId : null,
-      bipName: typeof raw.bipName === "string" ? raw.bipName : "",
-    };
   }
 
   function createSession() {
@@ -666,47 +769,16 @@
       lastStartedAt: null,
       activeTaskId: null,
       activeBipId: null,
+      isFinished: false,
+      finishedAt: null,
       tasks: [],
       events: [],
     };
   }
 
-  function createId() {
-    if (window.crypto && typeof window.crypto.randomUUID === "function") {
-      return window.crypto.randomUUID();
-    }
-
-    return `session-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-  }
-
-  function appendEvent(type, elapsedMs, createdAt, meta = {}) {
-    session.events.push({
-      id: createId(),
-      index: session.events.length + 1,
-      type,
-      label: typeof meta.label === "string" ? meta.label : getEventLabel(type, meta),
-      period: getPeriodLabel(session.currentPeriod),
-      elapsedMs: Math.max(0, Math.round(elapsedMs)),
-      createdAt: createdAt.toISOString(),
-      taskId: meta.taskId || null,
-      taskName: meta.taskName || "",
-      bipId: meta.bipId || null,
-      bipName: meta.bipName || "",
-    });
-  }
-
   function getPersistedSession() {
     return {
-      sessionId: session.sessionId,
-      createdAt: session.createdAt,
-      activityName: session.activityName,
-      currentPeriod: session.currentPeriod,
-      taskNameDraft: session.taskNameDraft,
-      clockState: session.clockState,
-      elapsedMs: session.elapsedMs,
-      lastStartedAt: session.lastStartedAt,
-      activeTaskId: session.activeTaskId,
-      activeBipId: session.activeBipId,
+      ...session,
       tasks: session.tasks.map((task) => ({
         ...task,
         bips: task.bips.map((bip) => ({ ...bip })),
@@ -716,6 +788,151 @@
     };
   }
 
+  function normalizeSession(raw) {
+    if (!raw || typeof raw !== "object") {
+      return createSession();
+    }
+
+    const base = createSession();
+    const nextSession = {
+      sessionId: typeof raw.sessionId === "string" && raw.sessionId ? raw.sessionId : base.sessionId,
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : base.createdAt,
+      activityName: typeof raw.activityName === "string" ? raw.activityName.slice(0, MAX_ACTIVITY) : base.activityName,
+      currentPeriod: typeof raw.currentPeriod === "string" ? raw.currentPeriod.slice(0, MAX_PERIOD) : base.currentPeriod,
+      taskNameDraft: typeof raw.taskNameDraft === "string" ? raw.taskNameDraft.slice(0, MAX_TASK) : base.taskNameDraft,
+      clockState: raw.clockState === "running" ? "running" : "paused",
+      elapsedMs: normMs(raw.elapsedMs),
+      lastStartedAt: isValidDate(raw.lastStartedAt) ? raw.lastStartedAt : null,
+      activeTaskId: typeof raw.activeTaskId === "string" ? raw.activeTaskId : null,
+      activeBipId: typeof raw.activeBipId === "string" ? raw.activeBipId : null,
+      isFinished: raw.isFinished === true,
+      finishedAt: isValidDate(raw.finishedAt) ? raw.finishedAt : null,
+      tasks: Array.isArray(raw.tasks) ? raw.tasks.map(normalizeTask).filter(Boolean) : [],
+      events: Array.isArray(raw.events)
+        ? raw.events.map(normalizeEvent).filter(Boolean).map((eventItem, index) => ({ ...eventItem, index: index + 1 }))
+        : [],
+    };
+
+    if (nextSession.clockState === "paused") {
+      nextSession.lastStartedAt = null;
+    }
+
+    if (nextSession.clockState === "running" && !nextSession.lastStartedAt) {
+      nextSession.clockState = "paused";
+    }
+
+    if (nextSession.clockState === "running" && !hasValue(nextSession.activityName)) {
+      nextSession.clockState = "paused";
+      nextSession.lastStartedAt = null;
+    }
+
+    if (nextSession.isFinished) {
+      nextSession.clockState = "paused";
+      nextSession.lastStartedAt = null;
+      nextSession.activeTaskId = null;
+      nextSession.activeBipId = null;
+    }
+
+    if (!findTask(nextSession.tasks, nextSession.activeTaskId)) {
+      nextSession.activeTaskId = null;
+    }
+
+    if (!findBip(nextSession.tasks, nextSession.activeBipId)) {
+      nextSession.activeBipId = null;
+    }
+
+    return nextSession;
+  }
+
+  function normalizeTask(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
+      name: taskLabel(raw.name, 1),
+      period: exportPeriodLabel(raw.period),
+      startElapsedMs: normMs(raw.startElapsedMs),
+      endElapsedMs: raw.endElapsedMs == null ? null : normMs(raw.endElapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      closedAt: isValidDate(raw.closedAt) ? raw.closedAt : null,
+      bips: Array.isArray(raw.bips) ? raw.bips.map(normalizeBip).filter(Boolean) : [],
+      rucks: Array.isArray(raw.rucks) ? raw.rucks.map(normalizeRuck).filter(Boolean) : [],
+    };
+  }
+
+  function normalizeBip(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
+      label: bipLabel(raw.label, 1),
+      period: exportPeriodLabel(raw.period),
+      startElapsedMs: normMs(raw.startElapsedMs),
+      endElapsedMs: raw.endElapsedMs == null ? null : normMs(raw.endElapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      closedAt: isValidDate(raw.closedAt) ? raw.closedAt : null,
+    };
+  }
+
+  function normalizeRuck(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
+      period: exportPeriodLabel(raw.period),
+      elapsedMs: normMs(raw.elapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      bipId: typeof raw.bipId === "string" ? raw.bipId : null,
+    };
+  }
+
+  function normalizeEvent(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    const type = EVENT_LABELS[raw.type] ? raw.type : null;
+    if (!type) {
+      return null;
+    }
+
+    return {
+      id: typeof raw.id === "string" && raw.id ? raw.id : createId(),
+      index: 0,
+      type,
+      label: eventLabel(type, raw),
+      period: exportPeriodLabel(raw.period),
+      elapsedMs: normMs(raw.elapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      taskId: typeof raw.taskId === "string" ? raw.taskId : null,
+      taskName: typeof raw.taskName === "string" ? raw.taskName : "",
+      bipId: typeof raw.bipId === "string" ? raw.bipId : null,
+      bipName: typeof raw.bipName === "string" ? raw.bipName : "",
+    };
+  }
+
+  function appendEvent(type, elapsedMs, createdAt, meta = {}) {
+    session.events.push({
+      id: createId(),
+      index: session.events.length + 1,
+      type,
+      label: typeof meta.label === "string" ? meta.label : eventLabel(type, meta),
+      period: exportPeriodLabel(session.currentPeriod),
+      elapsedMs: Math.max(0, Math.round(elapsedMs)),
+      createdAt: createdAt.toISOString(),
+      taskId: meta.taskId || null,
+      taskName: meta.taskName || "",
+      bipId: meta.bipId || null,
+      bipName: meta.bipName || "",
+    });
+  }
+
   function getExportSnapshot() {
     const nowIso = new Date().toISOString();
     const elapsedMs = getCurrentElapsedMs();
@@ -723,8 +940,8 @@
       sessionId: session.sessionId,
       createdAt: session.createdAt,
       exportedAt: nowIso,
-      activityName: getActivityLabel(session.activityName),
-      currentPeriod: getPeriodLabel(session.currentPeriod),
+      activityName: exportActivityLabel(session.activityName),
+      currentPeriod: exportPeriodLabel(session.currentPeriod),
       clockState: session.clockState,
       elapsedMs,
       lastStartedAt: session.lastStartedAt,
@@ -736,335 +953,97 @@
   }
 
   function exportTask(task, currentElapsedMs) {
-    const effectiveEnd = getTaskEffectiveEnd(task, currentElapsedMs);
+    const effectiveEndElapsedMs = taskEndMs(task, currentElapsedMs);
     return {
       ...task,
-      effectiveEndElapsedMs: effectiveEnd,
-      durationMs: Math.max(0, effectiveEnd - task.startElapsedMs),
+      effectiveEndElapsedMs,
+      durationMs: Math.max(0, effectiveEndElapsedMs - task.startElapsedMs),
       bips: task.bips.map((bip) => {
-        const bipEnd = getBipEffectiveEnd(bip, currentElapsedMs);
+        const bipEndElapsedMs = bipEndMs(bip, currentElapsedMs);
         return {
           ...bip,
-          effectiveEndElapsedMs: bipEnd,
-          durationMs: Math.max(0, bipEnd - bip.startElapsedMs),
+          effectiveEndElapsedMs: bipEndElapsedMs,
+          durationMs: Math.max(0, bipEndElapsedMs - bip.startElapsedMs),
         };
       }),
       rucks: task.rucks.map((ruck) => ({ ...ruck })),
     };
   }
 
-  function getCurrentElapsedMs(now = new Date()) {
-    const baseElapsed = normalizeElapsedMs(session.elapsedMs);
-    if (session.clockState !== "running" || !session.lastStartedAt) {
-      return baseElapsed;
-    }
-
-    const startedAtMs = Date.parse(session.lastStartedAt);
-    if (!Number.isFinite(startedAtMs)) {
-      return baseElapsed;
-    }
-
-    return baseElapsed + Math.max(0, now.getTime() - startedAtMs);
-  }
-
-  function normalizeElapsedMs(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      return 0;
-    }
-    return Math.round(parsed);
-  }
-
-  function renderAll() {
-    const snapshot = getViewSnapshot();
-    renderClock(snapshot);
-    renderSession(snapshot);
-    renderTimeline(snapshot);
-    renderEvents(snapshot);
-    renderSaveState();
-    syncButtons(snapshot);
-  }
-
-  function renderClock(snapshot = getViewSnapshot()) {
-    elements.clockDisplay.textContent = formatClock(snapshot.elapsedMs);
-    elements.statePill.textContent = snapshot.clockState === "running" ? "Running" : "Paused";
-    elements.periodBadge.textContent = snapshot.periodLabel;
-    elements.activityBadge.textContent = snapshot.activityLabel;
-    elements.taskBadge.textContent = snapshot.activeTask ? snapshot.activeTask.name : "No active task";
-    elements.bipBadge.textContent = snapshot.activeBip ? snapshot.activeBip.label : "No active BIP";
-    elements.liveStatus.textContent = snapshot.statusMessage;
-  }
-
-  function renderSession(snapshot = getViewSnapshot()) {
-    syncInputValue(elements.activityNameInput, session.activityName);
-    syncInputValue(elements.periodInput, session.currentPeriod);
-    syncInputValue(elements.taskNameInput, session.taskNameDraft);
-
-    elements.taskCount.textContent = String(snapshot.tasks.length);
-    elements.bipCount.textContent = String(snapshot.bipCount);
-    elements.ruckCount.textContent = String(snapshot.ruckCount);
-    elements.eventCount.textContent = String(snapshot.events.length);
-    elements.sessionStarted.textContent = formatDateTime(snapshot.createdAt);
-    elements.lastEvent.textContent = snapshot.lastEventLabel;
-  }
-
-  function renderTimeline(snapshot = getViewSnapshot()) {
-    elements.timelineScale.innerHTML = buildScale(snapshot.totalDurationMs);
-
-    const hasTasks = snapshot.tasks.length > 0;
-    elements.timelineEmpty.hidden = hasTasks;
-    elements.timelineMap.innerHTML = hasTasks
-      ? snapshot.tasks.map((task) => renderTaskRow(task, snapshot)).join("")
-      : "";
-
-    renderSelection(snapshot);
-  }
-
-  function renderEvents(snapshot = getViewSnapshot()) {
-    const hasEvents = snapshot.events.length > 0;
-    elements.eventsEmptyState.hidden = hasEvents;
-    elements.eventsList.innerHTML = hasEvents
-      ? snapshot.events
-          .slice()
-          .reverse()
-          .map((eventItem) => renderEventRow(eventItem, snapshot.activityLabel))
-          .join("")
-      : "";
-  }
-
-  function renderTaskRow(task, snapshot) {
-    const taskSelected = selectedEntity.taskId === task.id && selectedEntity.type !== "session";
-    const taskDuration = Math.max(0, task.effectiveEndElapsedMs - task.startElapsedMs);
-    const taskTiming = `${formatClock(task.startElapsedMs)} - ${formatClock(task.effectiveEndElapsedMs)}`;
-
-    return `
-      <article class="task-row${taskSelected ? " task-row--selected" : ""}" role="listitem">
-        <button class="task-meta" type="button" data-entity-type="task" data-task-id="${escapeHtml(task.id)}">
-          <span class="task-meta__name">${escapeHtml(task.name)}</span>
-          <span class="task-meta__summary">
-            ${escapeHtml(task.period)} | ${escapeHtml(taskTiming)} | ${escapeHtml(formatClock(taskDuration))} | ${task.bips.length} BIPs | ${task.rucks.length} rucks
-          </span>
-        </button>
-
-        <div class="task-track">
-          <button
-            class="task-span${task.isActive ? " task-span--active" : ""}"
-            type="button"
-            style="${intervalStyle(task.startElapsedMs, task.effectiveEndElapsedMs, snapshot.totalDurationMs)}"
-            data-entity-type="task"
-            data-task-id="${escapeHtml(task.id)}"
-            aria-label="${escapeHtml(task.name)}"
-          >
-            <span class="task-span__label">${escapeHtml(task.name)}</span>
-          </button>
-
-          ${task.bips
-            .map((bip) =>
-              renderBipSpan({
-                task,
-                bip,
-                totalDurationMs: snapshot.totalDurationMs,
-                isSelected:
-                  selectedEntity.type === "bip" &&
-                  selectedEntity.taskId === task.id &&
-                  selectedEntity.bipId === bip.id,
-              })
-            )
-            .join("")}
-
-          ${task.rucks
-            .map((ruck) =>
-              renderRuckMarker({
-                task,
-                ruck,
-                totalDurationMs: snapshot.totalDurationMs,
-                isSelected:
-                  selectedEntity.type === "ruck" &&
-                  selectedEntity.taskId === task.id &&
-                  selectedEntity.ruckId === ruck.id,
-              })
-            )
-            .join("")}
-        </div>
-      </article>
-    `;
-  }
-
-  function renderBipSpan({ task, bip, totalDurationMs, isSelected }) {
-    return `
-      <button
-        class="bip-span${bip.isActive ? " bip-span--active" : ""}${isSelected ? " bip-span--selected" : ""}"
-        type="button"
-        style="${intervalStyle(bip.startElapsedMs, bip.effectiveEndElapsedMs, totalDurationMs)}"
-        data-entity-type="bip"
-        data-task-id="${escapeHtml(task.id)}"
-        data-bip-id="${escapeHtml(bip.id)}"
-        aria-label="${escapeHtml(bip.label)}"
-      >
-        <span class="bip-span__label">${escapeHtml(bip.label)}</span>
-      </button>
-    `;
-  }
-
-  function renderRuckMarker({ task, ruck, totalDurationMs, isSelected }) {
-    return `
-      <button
-        class="ruck-marker${isSelected ? " ruck-marker--selected" : ""}"
-        type="button"
-        style="left: ${toPercent(ruck.elapsedMs, totalDurationMs)}%;"
-        data-entity-type="ruck"
-        data-task-id="${escapeHtml(task.id)}"
-        data-ruck-id="${escapeHtml(ruck.id)}"
-        aria-label="Ruck ${escapeHtml(formatClock(ruck.elapsedMs))}"
-      ></button>
-    `;
-  }
-
-  function renderSelection(snapshot) {
-    const selection = getSelectionDescriptor(snapshot);
-    elements.selectionTitle.textContent = selection.title;
-    elements.selectionMeta.textContent = selection.meta;
-    elements.selectionSummary.textContent = selection.summary;
-    elements.selectionActivity.textContent = selection.activity;
-    elements.selectionPeriod.textContent = selection.period;
-    elements.selectionTiming.textContent = selection.timing;
-    elements.selectionDuration.textContent = selection.duration;
-    elements.selectionContext.textContent = selection.context;
-  }
-
-  function renderEventRow(eventItem, activityLabel) {
-    return `
-      <article class="event-row" role="listitem" data-type="${escapeHtml(eventItem.type)}">
-        <div class="event-cell">
-          <div class="event-cell__label">Event</div>
-          <div class="event-name">${escapeHtml(eventItem.label)}</div>
-        </div>
-        <div class="event-cell">
-          <div class="event-cell__label">Type</div>
-          <div class="event-type event-type--${escapeHtml(eventItem.type)}">
-            ${escapeHtml(eventTypeLabels[eventItem.type])}
-          </div>
-        </div>
-        <div class="event-cell">
-          <div class="event-cell__label">Context</div>
-          <div class="event-context">${escapeHtml(buildEventContext(eventItem, activityLabel))}</div>
-        </div>
-        <div class="event-cell">
-          <div class="event-cell__label">Elapsed</div>
-          <div class="event-elapsed">${escapeHtml(formatClock(eventItem.elapsedMs))}</div>
-        </div>
-        <div class="event-cell">
-          <div class="event-cell__label">Created</div>
-          <div class="event-created">${escapeHtml(formatDateTime(eventItem.createdAt))}</div>
-        </div>
-      </article>
-    `;
-  }
-
-  function renderSaveState() {
-    if (!saveState.available) {
-      elements.savePill.textContent = "Auto-save unavailable";
-      return;
-    }
-
-    if (!saveState.lastSavedAt) {
-      elements.savePill.textContent = "Auto-save ready";
-      return;
-    }
-
-    elements.savePill.textContent = `Saved ${formatTimeOnly(saveState.lastSavedAt.toISOString())}`;
-  }
-
-  function syncButtons(snapshot = getViewSnapshot()) {
-    const isRunning = snapshot.clockState === "running";
-    const hasActiveTask = Boolean(snapshot.activeTask);
-    const hasActiveBip = Boolean(snapshot.activeBip);
-
-    elements.playBtn.disabled = isRunning;
-    elements.pauseBtn.disabled = !isRunning;
-    elements.taskBtn.disabled = !isRunning && !hasActiveTask;
-    elements.bipBtn.disabled = !hasActiveTask || (!isRunning && !hasActiveBip);
-    elements.ruckBtn.disabled = !isRunning || !hasActiveTask;
-
-    elements.taskBtnLabel.textContent = hasActiveTask ? "End Task" : "Start Task";
-    elements.taskBtnMeta.textContent = hasActiveTask
-      ? `Close ${snapshot.activeTask.name} at the current clock time`
-      : "Open a task using the task name field";
-
-    elements.bipBtnLabel.textContent = hasActiveBip ? "End BIP" : "Start BIP";
-    elements.bipBtnMeta.textContent = hasActiveBip
-      ? `Close ${snapshot.activeBip.label} inside ${snapshot.activeTask.name}`
-      : hasActiveTask
-        ? "Add a nested ball-in-play interval inside the active task"
-        : "Start a task before creating a BIP interval";
-  }
-
-  function syncClockTimer() {
-    if (session.clockState === "running" && !tickTimer) {
-      tickTimer = window.setInterval(() => {
-        renderClock();
-        renderTimeline();
-      }, CLOCK_TICK_MS);
-      return;
-    }
-
-    if (session.clockState !== "running" && tickTimer) {
-      window.clearInterval(tickTimer);
-      tickTimer = null;
-    }
-  }
-
   function getViewSnapshot() {
     const elapsedMs = getCurrentElapsedMs();
     const tasks = session.tasks.map((task) => toViewTask(task, elapsedMs));
     const activeTask = tasks.find((task) => task.id === session.activeTaskId) || null;
-    const activeBip =
-      activeTask && session.activeBipId
-        ? activeTask.bips.find((bip) => bip.id === session.activeBipId) || null
-        : null;
-    const events = session.events.map((eventItem) => ({ ...eventItem }));
-    const lastEvent = events[events.length - 1] || null;
+    const activeBip = activeTask && session.activeBipId
+      ? activeTask.bips.find((bip) => bip.id === session.activeBipId) || null
+      : null;
+    const selectedTask = normalizeSelectedTask(tasks, activeTask);
     const bipCount = tasks.reduce((sum, task) => sum + task.bips.length, 0);
     const ruckCount = tasks.reduce((sum, task) => sum + task.rucks.length, 0);
 
     return {
-      createdAt: session.createdAt,
       elapsedMs,
       clockState: session.clockState,
-      activityLabel: getActivityLabel(session.activityName),
-      periodLabel: getPeriodLabel(session.currentPeriod),
+      activityLabel: labelActivity(session.activityName),
+      periodLabel: labelPeriod(session.currentPeriod),
+      hasNamedActivity: hasValue(session.activityName),
+      hasNamedPeriod: hasValue(session.currentPeriod),
+      isFinished: session.isFinished === true,
+      nextTaskName: getNextTaskName(),
       tasks,
-      events,
+      events: session.events.map((eventItem) => ({ ...eventItem })),
       activeTask,
       activeBip,
+      selectedTask,
       bipCount,
       ruckCount,
-      totalDurationMs: getTotalDurationMs(tasks, events, elapsedMs),
-      lastEventLabel: lastEvent
-        ? `${lastEvent.label} at ${formatClock(lastEvent.elapsedMs)}`
-        : "None yet",
-      statusMessage: buildStatusMessage({
-        activityLabel: getActivityLabel(session.activityName),
+      totalDurationMs: getTotalDuration(tasks, session.events, elapsedMs),
+      statusMessage: buildStatus({
+        hasNamedActivity: hasValue(session.activityName),
+        hasNamedPeriod: hasValue(session.currentPeriod),
         clockState: session.clockState,
         activeTask,
         activeBip,
+        nextTaskName: getNextTaskName(),
       }),
     };
   }
 
+  function normalizeSelectedTask(tasks, activeTask) {
+    if (selectionCleared) {
+      return null;
+    }
+
+    if (selectedTaskId) {
+      const selected = tasks.find((task) => task.id === selectedTaskId);
+      if (selected) {
+        return selected;
+      }
+    }
+
+    if (activeTask) {
+      selectedTaskId = activeTask.id;
+      return activeTask;
+    }
+
+    const latestTask = tasks.at(-1) || null;
+    selectedTaskId = latestTask ? latestTask.id : null;
+    return latestTask;
+  }
+
   function toViewTask(task, currentElapsedMs) {
-    const effectiveEndElapsedMs = getTaskEffectiveEnd(task, currentElapsedMs);
+    const effectiveEndElapsedMs = taskEndMs(task, currentElapsedMs);
     return {
       ...task,
       effectiveEndElapsedMs,
       durationMs: Math.max(0, effectiveEndElapsedMs - task.startElapsedMs),
       isActive: session.activeTaskId === task.id && task.endElapsedMs === null,
       bips: task.bips.map((bip) => {
-        const bipEnd = getBipEffectiveEnd(bip, currentElapsedMs);
+        const effectiveBipEndElapsedMs = bipEndMs(bip, currentElapsedMs);
         return {
           ...bip,
-          effectiveEndElapsedMs: bipEnd,
-          durationMs: Math.max(0, bipEnd - bip.startElapsedMs),
+          effectiveEndElapsedMs: effectiveBipEndElapsedMs,
+          durationMs: Math.max(0, effectiveBipEndElapsedMs - bip.startElapsedMs),
           isActive: session.activeBipId === bip.id && bip.endElapsedMs === null,
         };
       }),
@@ -1072,164 +1051,252 @@
     };
   }
 
-  function getSelectionDescriptor(snapshot) {
-    const safeSelection = normalizeSelection(snapshot);
-    selectedEntity = safeSelection;
-
-    if (safeSelection.type === "task") {
-      const task = snapshot.tasks.find((item) => item.id === safeSelection.taskId);
-      if (task) {
-        return {
-          title: task.name,
-          meta: "Task interval",
-          summary: `${task.bips.length} BIPs and ${task.rucks.length} rucks captured in this task.`,
-          activity: snapshot.activityLabel,
-          period: task.period,
-          timing: `${formatClock(task.startElapsedMs)} to ${formatClock(task.effectiveEndElapsedMs)}`,
-          duration: formatClock(task.durationMs),
-          context: task.isActive
-            ? "Task is still active and will keep extending with the live clock."
-            : "Task closed and is ready for export or review.",
-        };
-      }
-    }
-
-    if (safeSelection.type === "bip") {
-      const task = snapshot.tasks.find((item) => item.id === safeSelection.taskId);
-      const bip = task ? task.bips.find((item) => item.id === safeSelection.bipId) : null;
-      if (task && bip) {
-        return {
-          title: bip.label,
-          meta: "Nested BIP interval",
-          summary: `Ball-in-play window inside ${task.name}.`,
-          activity: snapshot.activityLabel,
-          period: bip.period,
-          timing: `${formatClock(bip.startElapsedMs)} to ${formatClock(bip.effectiveEndElapsedMs)}`,
-          duration: formatClock(bip.durationMs),
-          context: bip.isActive
-            ? `Still active inside ${task.name}.`
-            : `Closed inside ${task.name}.`,
-        };
-      }
-    }
-
-    if (safeSelection.type === "ruck") {
-      const task = snapshot.tasks.find((item) => item.id === safeSelection.taskId);
-      const ruck = task ? task.rucks.find((item) => item.id === safeSelection.ruckId) : null;
-      if (task && ruck) {
-        return {
-          title: "Ruck",
-          meta: "Point event",
-          summary: ruck.bipId
-            ? `Marked during ${getBipName(task, ruck.bipId)}.`
-            : `Marked on ${task.name} outside a BIP interval.`,
-          activity: snapshot.activityLabel,
-          period: ruck.period,
-          timing: formatClock(ruck.elapsedMs),
-          duration: "Point event",
-          context: `Attached to ${task.name}.`,
-        };
-      }
-    }
-
-    return {
-      title: snapshot.activityLabel,
-      meta: "Session overview",
-      summary: `${snapshot.tasks.length} tasks, ${snapshot.bipCount} BIPs, ${snapshot.ruckCount} rucks, ${snapshot.events.length} total events.`,
-      activity: snapshot.activityLabel,
-      period: snapshot.periodLabel,
-      timing: `Started ${formatDateTime(snapshot.createdAt)}`,
-      duration: formatClock(snapshot.elapsedMs),
-      context: snapshot.activeTask
-        ? snapshot.activeBip
-          ? `${snapshot.activeTask.name} is active with ${snapshot.activeBip.label} nested inside it.`
-          : `${snapshot.activeTask.name} is active and ready for a BIP interval.`
-        : "No active task. Start one to build the visualization.",
-    };
+  function renderAll() {
+    const snapshot = getViewSnapshot();
+    renderClock(snapshot);
+    renderEditors(snapshot);
+    renderTimeline(snapshot);
+    renderEvents(snapshot);
+    renderSaveState();
+    syncButtons(snapshot);
   }
 
-  function normalizeSelection(snapshot) {
-    if (selectedEntity.type === "task" && snapshot.tasks.some((task) => task.id === selectedEntity.taskId)) {
-      return selectedEntity;
+  function renderClock(snapshot = getViewSnapshot()) {
+    el.clockDisplay.textContent = fmtClock(snapshot.elapsedMs);
+    el.clockDisplay.classList.toggle("clock-display--running", snapshot.clockState === "running");
+
+    el.statePill.textContent = snapshot.isFinished ? "Finished" : snapshot.clockState === "running" ? "Running" : "Paused";
+    el.statePill.classList.toggle("state-pill--running", !snapshot.isFinished && snapshot.clockState === "running");
+    el.statePill.classList.toggle("state-pill--paused", !snapshot.isFinished && snapshot.clockState !== "running");
+    el.statePill.classList.toggle("state-pill--finished", snapshot.isFinished);
+
+    el.activityBadge.textContent = snapshot.activityLabel;
+    el.periodBadge.textContent = snapshot.periodLabel;
+    el.taskBadge.textContent = snapshot.activeTask ? snapshot.activeTask.name : "No active task";
+    el.bipBadge.textContent = snapshot.activeBip ? snapshot.activeBip.label : "No active BIP";
+    el.taskBadge.closest(".badge")?.classList.toggle("badge--live", Boolean(snapshot.activeTask));
+    el.bipBadge.closest(".badge")?.classList.toggle("badge--live", Boolean(snapshot.activeBip));
+    el.liveStatus.textContent = snapshot.statusMessage;
+  }
+
+  function renderEditors(snapshot = getViewSnapshot()) {
+    syncInput(el.periodInput, session.currentPeriod);
+    el.taskCount.textContent = String(snapshot.tasks.length);
+    el.bipCount.textContent = String(snapshot.bipCount);
+    el.ruckCount.textContent = String(snapshot.ruckCount);
+    el.eventCount.textContent = String(snapshot.events.length);
+    el.logToggleCount.textContent = String(snapshot.events.length);
+    el.periodInput.disabled = snapshot.isFinished;
+    renderFinishButton(snapshot);
+
+    const selectedTask = snapshot.selectedTask;
+    if (!selectedTask) {
+      el.selectedTaskPanel.hidden = true;
+      syncInput(el.selectedTaskNameInput, "");
+      return;
     }
 
-    if (selectedEntity.type === "bip") {
-      const task = snapshot.tasks.find((item) => item.id === selectedEntity.taskId);
-      if (task && task.bips.some((bip) => bip.id === selectedEntity.bipId)) {
-        return selectedEntity;
-      }
-    }
+    el.selectedTaskPanel.hidden = false;
+    el.selectedTaskPanel.dataset.state = selectedTask.isActive ? "active" : "idle";
+    el.selectedTaskTitle.textContent = selectedTask.name;
+    el.selectedTaskState.textContent = selectedTask.isActive ? "Live" : "Selected";
+    el.selectedTaskMeta.textContent = `${selectedTask.period} · ${fmtClock(selectedTask.durationMs)}`;
+    syncInput(el.selectedTaskNameInput, selectedTask.name);
+    el.selectedTaskNameInput.disabled = snapshot.isFinished;
 
-    if (selectedEntity.type === "ruck") {
-      const task = snapshot.tasks.find((item) => item.id === selectedEntity.taskId);
-      if (task && task.rucks.some((ruck) => ruck.id === selectedEntity.ruckId)) {
-        return selectedEntity;
-      }
-    }
-
-    if (snapshot.activeBip) {
-      return {
-        type: "bip",
-        taskId: snapshot.activeTask.id,
-        bipId: snapshot.activeBip.id,
-      };
+    if (selectedTask.isActive) {
+      el.selectedTaskActionBtn.textContent = "Stop selected";
+      el.selectedTaskActionBtn.disabled = snapshot.isFinished;
+      return;
     }
 
     if (snapshot.activeTask) {
-      return { type: "task", taskId: snapshot.activeTask.id };
+      el.selectedTaskActionBtn.textContent = "Live task running";
+      el.selectedTaskActionBtn.disabled = true;
+      return;
     }
 
-    if (snapshot.tasks[0]) {
-      return { type: "task", taskId: snapshot.tasks[0].id };
-    }
-
-    return { type: "session" };
+    el.selectedTaskActionBtn.textContent = "Start selected";
+    el.selectedTaskActionBtn.disabled = snapshot.isFinished || snapshot.clockState !== "running";
   }
 
-  function buildScale(totalDurationMs) {
-    const divisions = 5;
-    return Array.from({ length: divisions }, (_, index) => {
-      const ratio = divisions === 1 ? 0 : index / (divisions - 1);
-      return `
-        <div class="timeline-scale__item">
-          <span class="timeline-scale__label">${escapeHtml(formatClock(totalDurationMs * ratio))}</span>
+  function renderFinishButton(snapshot = getViewSnapshot()) {
+    if (snapshot.isFinished) {
+      el.finishBtn.textContent = "Activity finished";
+      el.finishBtn.dataset.state = "finished";
+      el.finishBtn.disabled = true;
+      return;
+    }
+
+    if (isFinishConfirmArmed()) {
+      el.finishBtn.textContent = "Confirm finish";
+      el.finishBtn.dataset.state = "armed";
+      el.finishBtn.disabled = false;
+      return;
+    }
+
+    el.finishBtn.textContent = "Finish activity";
+    el.finishBtn.dataset.state = "idle";
+    el.finishBtn.disabled = !snapshot.hasNamedActivity;
+  }
+
+  function renderTimeline(snapshot = getViewSnapshot()) {
+    const hasTasks = snapshot.tasks.length > 0;
+    el.timelineScale.innerHTML = hasTasks ? buildScale(snapshot.totalDurationMs) : "";
+    el.timelineEmpty.hidden = hasTasks;
+    el.timelineMap.innerHTML = hasTasks ? renderUnifiedTimeline(snapshot) : "";
+  }
+
+  function renderUnifiedTimeline(snapshot) {
+    return `
+      <article class="timeline-single" role="listitem">
+        <div class="timeline-single__meta">
+          <span class="timeline-single__label">Session timeline</span>
+          <span class="timeline-single__summary">${snapshot.tasks.length} tasks · ${snapshot.bipCount} BIPs · ${snapshot.ruckCount} rucks</span>
         </div>
-      `;
-    }).join("");
+        <div class="timeline-stack">
+          <div class="timeline-lane timeline-lane--tasks">
+            ${snapshot.tasks.map((task) => renderTaskSpan(task, snapshot)).join("")}
+          </div>
+          <div class="timeline-lane timeline-lane--events">
+            ${snapshot.tasks.flatMap((task) => task.bips.map((bip) => renderBipSpan(task, bip, snapshot))).join("")}
+            ${snapshot.tasks.flatMap((task) => task.rucks.map((ruck) => renderRuckMarker(task, ruck, snapshot))).join("")}
+          </div>
+        </div>
+      </article>
+    `;
   }
 
-  function buildStatusMessage({ activityLabel, clockState, activeTask, activeBip }) {
-    if (clockState !== "running") {
-      return `Clock is paused. Press Play to start ${activityLabel}.`;
+  function renderTaskSpan(task, snapshot) {
+    const classes = [
+      "task-span",
+      task.isActive ? "task-span--active" : "",
+      snapshot.selectedTask?.id === task.id ? "task-span--selected" : "",
+    ].filter(Boolean).join(" ");
+
+    return `
+      <button
+        class="${classes}"
+        type="button"
+        style="${intervalStyle(task.startElapsedMs, task.effectiveEndElapsedMs, snapshot.totalDurationMs)}"
+        data-task-id="${esc(task.id)}"
+        aria-label="${esc(task.name)}"
+      >
+        <span class="task-span__label">${esc(task.name)}</span>
+      </button>
+    `;
+  }
+
+  function renderBipSpan(task, bip, snapshot) {
+    return `
+      <button
+        class="bip-span${bip.isActive ? " bip-span--active" : ""}"
+        type="button"
+        style="${intervalStyle(bip.startElapsedMs, bip.effectiveEndElapsedMs, snapshot.totalDurationMs)}"
+        data-task-id="${esc(task.id)}"
+        aria-label="${esc(`${bip.label} inside ${task.name}`)}"
+      >
+        <span class="bip-span__label">${esc(bip.label)}</span>
+      </button>
+    `;
+  }
+
+  function renderRuckMarker(task, ruck, snapshot) {
+    return `
+      <button
+        class="ruck-marker"
+        type="button"
+        style="left:${toPct(ruck.elapsedMs, snapshot.totalDurationMs)}%"
+        data-task-id="${esc(task.id)}"
+        aria-label="${esc(`Ruck in ${task.name} at ${fmtClock(ruck.elapsedMs)}`)}"
+      ></button>
+    `;
+  }
+
+  function renderEvents(snapshot = getViewSnapshot()) {
+    const hasEvents = snapshot.events.length > 0;
+    el.eventsEmptyState.hidden = hasEvents;
+    el.eventsList.innerHTML = hasEvents
+      ? snapshot.events.slice().reverse().map((eventItem) => `
+          <article class="event-row" role="listitem">
+            <span class="event-type-dot event-type-dot--${esc(eventItem.type)}"></span>
+            <span class="event-label">${esc(eventItem.label)}</span>
+            <span class="event-elapsed">${esc(fmtClock(eventItem.elapsedMs))}</span>
+          </article>
+        `).join("")
+      : "";
+  }
+
+  function renderSaveState() {
+    if (!saveState.available) {
+      el.savePill.title = "Auto-save unavailable";
+      el.savePill.classList.add("save-dot--warn");
+      return;
     }
 
-    if (activeTask && activeBip) {
-      return `${activeTask.name} is live with ${activeBip.label} nested inside it.`;
+    el.savePill.classList.remove("save-dot--warn");
+    el.savePill.title = saveState.lastSavedAt
+      ? `Saved ${fmtTime(saveState.lastSavedAt.toISOString())}`
+      : "Auto-save ready";
+  }
+
+  function syncButtons(snapshot = getViewSnapshot()) {
+    const running = snapshot.clockState === "running";
+    const hasTask = Boolean(snapshot.activeTask);
+    const hasBip = Boolean(snapshot.activeBip);
+    const locked = snapshot.isFinished;
+
+    el.playBtn.disabled = locked || running;
+    el.pauseBtn.disabled = locked || !running;
+    el.taskBtn.disabled = locked || (hasTask ? false : !running);
+    el.bipBtn.disabled = locked || !hasTask || (!running && !hasBip);
+    el.ruckBtn.disabled = locked || !running || !hasTask;
+
+    el.taskBtnLabel.textContent = hasTask ? "T■" : "T+";
+    el.taskBtn.dataset.active = hasTask ? "true" : "false";
+    el.taskBtnIcon.innerHTML = hasTask ? ICON_TASK_STOP : ICON_TASK_ADD;
+
+    el.bipBtnLabel.textContent = hasBip ? "B■" : "BIP";
+    el.bipBtn.dataset.active = hasBip ? "true" : "false";
+    el.bipBtnIcon.innerHTML = hasBip ? ICON_BIP_STOP : ICON_BIP_START;
+  }
+
+  function syncClockTimer() {
+    const shouldRun = session.clockState === "running";
+    if (shouldRun && !tickTimer) {
+      tickTimer = window.setInterval(() => {
+        renderClock();
+        renderTimeline();
+      }, CLOCK_TICK_MS);
+      return;
     }
 
-    if (activeTask) {
-      return `${activeTask.name} is active. Start a BIP interval whenever ball is in play.`;
+    if (!shouldRun && tickTimer) {
+      window.clearInterval(tickTimer);
+      tickTimer = null;
     }
-
-    return `Clock is running for ${activityLabel}. Start a task to structure the session.`;
   }
 
   function getActiveTask() {
-    return findTaskById(session.tasks, session.activeTaskId);
+    return findTask(session.tasks, session.activeTaskId);
   }
 
   function getActiveBip() {
-    return findBipById(session.tasks, session.activeBipId);
+    return findBip(session.tasks, session.activeBipId);
   }
 
-  function findTaskById(tasks, taskId) {
+  function getSelectedTaskFromSession() {
+    return findTask(session.tasks, selectedTaskId);
+  }
+
+  function findTask(tasks, taskId) {
     if (!taskId) {
       return null;
     }
     return tasks.find((task) => task.id === taskId) || null;
   }
 
-  function findBipById(tasks, bipId) {
+  function findBip(tasks, bipId) {
     if (!bipId) {
       return null;
     }
@@ -1244,15 +1311,25 @@
     return null;
   }
 
-  function getTaskEffectiveEnd(task, currentElapsedMs) {
+  function getCurrentElapsedMs(now = new Date()) {
+    const baseElapsedMs = normMs(session.elapsedMs);
+    if (session.clockState !== "running" || !session.lastStartedAt) {
+      return baseElapsedMs;
+    }
+
+    const startedAtMs = Date.parse(session.lastStartedAt);
+    return Number.isFinite(startedAtMs) ? baseElapsedMs + Math.max(0, now.getTime() - startedAtMs) : baseElapsedMs;
+  }
+
+  function taskEndMs(task, currentElapsedMs) {
     return task.endElapsedMs === null ? currentElapsedMs : task.endElapsedMs;
   }
 
-  function getBipEffectiveEnd(bip, currentElapsedMs) {
+  function bipEndMs(bip, currentElapsedMs) {
     return bip.endElapsedMs === null ? currentElapsedMs : bip.endElapsedMs;
   }
 
-  function getTotalDurationMs(tasks, events, elapsedMs) {
+  function getTotalDuration(tasks, events, elapsedMs) {
     let maxValue = Math.max(1, elapsedMs);
 
     tasks.forEach((task) => {
@@ -1273,30 +1350,49 @@
   }
 
   function getNextTaskName() {
-    return getTaskLabel(session.taskNameDraft, session.tasks.length + 1);
+    return taskLabel("", session.tasks.length + 1);
   }
 
-  function getTaskLabel(value, fallbackIndex) {
+  function getTaskOrdinal(taskId) {
+    const index = session.tasks.findIndex((task) => task.id === taskId);
+    return index >= 0 ? index + 1 : session.tasks.length + 1;
+  }
+
+  function taskLabel(value, fallbackIndex) {
     const text = String(value || "").trim();
     return text || `Task ${fallbackIndex}`;
   }
 
-  function getBipLabel(value, fallbackIndex) {
+  function bipLabel(value, fallbackIndex) {
     const text = String(value || "").trim();
     return text || `BIP ${fallbackIndex}`;
   }
 
-  function getActivityLabel(value) {
+  function labelActivity(value) {
     const text = String(value || "").trim();
-    return text || DEFAULT_ACTIVITY_NAME;
+    return text || PROMPT_ACTIVITY;
   }
 
-  function getPeriodLabel(value) {
+  function labelPeriod(value) {
     const text = String(value || "").trim();
-    return text || "Untitled Period";
+    return text || PROMPT_PERIOD;
   }
 
-  function getEventLabel(type, meta) {
+  function exportActivityLabel(value) {
+    const text = String(value || "").trim();
+    return text || DEFAULT_ACTIVITY;
+  }
+
+  function exportPeriodLabel(value) {
+    const text = String(value || "").trim();
+    return text || EXPORT_PERIOD;
+  }
+
+  function hasValue(value) {
+    return Boolean(String(value || "").trim());
+  }
+
+  function eventLabel(type, meta) {
     if (typeof meta.label === "string" && meta.label.trim()) {
       return meta.label.trim();
     }
@@ -1317,21 +1413,7 @@
       return `End ${meta.bipName || "BIP"}`;
     }
 
-    return eventTypeLabels[type] || "Event";
-  }
-
-  function buildEventContext(eventItem, activityLabel) {
-    const context = [];
-
-    if (eventItem.taskName) {
-      context.push(eventItem.taskName);
-    }
-
-    if (eventItem.bipName) {
-      context.push(eventItem.bipName);
-    }
-
-    return context.length ? context.join(" / ") : activityLabel;
+    return EVENT_LABELS[type] || "Event";
   }
 
   function getBipName(task, bipId) {
@@ -1342,107 +1424,103 @@
     return bip ? bip.label : "";
   }
 
-  function intervalStyle(startElapsedMs, endElapsedMs, totalDurationMs) {
-    const safeStart = Math.max(0, startElapsedMs);
-    const safeEnd = Math.max(safeStart, endElapsedMs);
-    const left = toPercent(safeStart, totalDurationMs);
-    const width = Math.max(toPercent(safeEnd - safeStart, totalDurationMs), 1.6);
-    return `left: ${left}%; width: ${width}%;`;
-  }
-
-  function toPercent(value, total) {
-    if (!Number.isFinite(total) || total <= 0) {
-      return 0;
+  function buildStatus({ hasNamedActivity, hasNamedPeriod, clockState, activeTask, activeBip, nextTaskName }) {
+    if (session.isFinished) {
+      return "Activity finished. ZIP downloaded. Start a new activity or reset.";
     }
-    return (Math.max(0, value) / total) * 100;
+
+    if (!hasNamedActivity) {
+      return "Press Play to name and start the activity.";
+    }
+
+    if (clockState !== "running") {
+      return "Activity locked. Press Play to resume the clock.";
+    }
+
+    if (activeTask && activeBip) {
+      return `${activeTask.name} is live. ${activeBip.label} is active inside it.`;
+    }
+
+    if (activeTask) {
+      return `${activeTask.name} is active. Use BIP when the ball is in play.`;
+    }
+
+    return `Press T+ to start ${nextTaskName}.`;
   }
 
-  function syncInputValue(input, value) {
+  function syncInput(input, value) {
     if (input.value !== value) {
       input.value = value;
     }
   }
 
-  function formatClock(totalMs) {
+  function announce(message) {
+    el.srStatus.textContent = message;
+  }
+
+  function intervalStyle(startElapsedMs, endElapsedMs, totalDurationMs) {
+    const safeStart = Math.max(0, startElapsedMs);
+    const safeEnd = Math.max(safeStart, endElapsedMs);
+    return `left:${toPct(safeStart, totalDurationMs)}%;width:${Math.max(toPct(safeEnd - safeStart, totalDurationMs), 1.4)}%`;
+  }
+
+  function toPct(value, total) {
+    return !Number.isFinite(total) || total <= 0 ? 0 : (Math.max(0, value) / total) * 100;
+  }
+
+  function buildScale(totalDurationMs) {
+    return Array.from({ length: 5 }, (_, index) => {
+      const ratio = index / 4;
+      return `<div class="timeline-scale__item"><span class="timeline-scale__label">${esc(fmtClock(totalDurationMs * ratio))}</span></div>`;
+    }).join("");
+  }
+
+  function fmtClock(totalMs) {
     const totalSeconds = Math.max(0, Math.floor(Number(totalMs || 0) / 1000));
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+    return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
   }
 
-  function formatDateTime(value) {
+  function fmtTime(value) {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "Invalid time";
-    }
-
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(date);
-  }
-
-  function formatTimeOnly(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "--:--";
-    }
-
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(date);
+    return Number.isNaN(date.getTime())
+      ? "--:--"
+      : new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }).format(date);
   }
 
   function buildFilenameBase(activityName, isoDate) {
     const date = new Date(isoDate);
-    const stamp = [
-      date.getFullYear(),
-      pad2(date.getMonth() + 1),
-      pad2(date.getDate()),
-      "-",
-      pad2(date.getHours()),
-      pad2(date.getMinutes()),
-      pad2(date.getSeconds()),
-    ].join("");
-
-    return `${slugify(activityName)}-${stamp}`;
+    return `${slugify(activityName)}-${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}-${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
   }
 
   function slugify(value) {
-    const base = String(value || DEFAULT_ACTIVITY_NAME)
+    const base = String(value || DEFAULT_ACTIVITY)
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-
     return base || "activity";
   }
 
   function csvEscape(value) {
     const text = String(value ?? "");
-    if (!/[",\n]/.test(text)) {
-      return text;
-    }
-
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-
-  function announce(message) {
-    elements.srStatus.textContent = message;
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   }
 
   function pad2(value) {
     return String(Math.max(0, Math.trunc(value))).padStart(2, "0");
   }
 
-  function escapeHtml(text) {
+  function normMs(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0;
+  }
+
+  function esc(text) {
     return String(text)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -1451,7 +1529,159 @@
       .replaceAll("'", "&#39;");
   }
 
-  function isValidDateString(value) {
+  function isValidDate(value) {
     return typeof value === "string" && Number.isFinite(Date.parse(value));
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID?.() ?? `s-${Date.now()}-${Math.floor(Math.random() * 1e5)}`;
+  }
+
+  function sessionHasProgress() {
+    return (
+      hasValue(session.activityName) ||
+      hasValue(session.currentPeriod) ||
+      session.elapsedMs > 0 ||
+      session.tasks.length > 0 ||
+      session.events.length > 0
+    );
+  }
+
+  function isFinishConfirmArmed() {
+    return finishConfirmExpiresAt > Date.now();
+  }
+
+  function armFinishConfirm() {
+    finishConfirmExpiresAt = Date.now() + 4000;
+    if (finishConfirmTimer) {
+      window.clearTimeout(finishConfirmTimer);
+    }
+    finishConfirmTimer = window.setTimeout(() => {
+      clearFinishConfirm(false);
+      renderAll();
+    }, 4000);
+  }
+
+  function clearFinishConfirm(shouldRender = true) {
+    finishConfirmExpiresAt = 0;
+    if (finishConfirmTimer) {
+      window.clearTimeout(finishConfirmTimer);
+      finishConfirmTimer = null;
+    }
+    if (shouldRender) {
+      renderAll();
+    }
+  }
+
+  function buildZipBlob(folderName, files) {
+    const dos = toDosDateTime(new Date());
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    const entries = [{ name: `${folderName}/`, bytes: new Uint8Array(0), isDirectory: true }, ...files];
+
+    for (const entry of entries) {
+      const nameBytes = zipEncoder.encode(entry.name);
+      const dataBytes = entry.bytes;
+      const crc = entry.isDirectory ? 0 : crc32(dataBytes);
+      const size = dataBytes.length;
+      const localHeader = createLocalZipHeader(nameBytes, crc, size, dos);
+      localParts.push(localHeader, nameBytes, dataBytes);
+
+      const centralHeader = createCentralZipHeader(nameBytes, crc, size, dos, offset, entry.isDirectory === true);
+      centralParts.push(centralHeader, nameBytes);
+      offset += localHeader.length + nameBytes.length + dataBytes.length;
+    }
+
+    const centralSize = byteLength(centralParts);
+    const endRecord = createZipEndRecord(entries.length, centralSize, offset);
+    return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
+  }
+
+  function createLocalZipHeader(nameBytes, crc, size, dos) {
+    const buffer = new ArrayBuffer(30);
+    const view = new DataView(buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, dos.time, true);
+    view.setUint16(12, dos.date, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, size, true);
+    view.setUint32(22, size, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    return new Uint8Array(buffer);
+  }
+
+  function createCentralZipHeader(nameBytes, crc, size, dos, offset, isDirectory) {
+    const buffer = new ArrayBuffer(46);
+    const view = new DataView(buffer);
+    view.setUint32(0, 0x02014b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 20, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, 0, true);
+    view.setUint16(12, dos.time, true);
+    view.setUint16(14, dos.date, true);
+    view.setUint32(16, crc, true);
+    view.setUint32(20, size, true);
+    view.setUint32(24, size, true);
+    view.setUint16(28, nameBytes.length, true);
+    view.setUint16(30, 0, true);
+    view.setUint16(32, 0, true);
+    view.setUint16(34, 0, true);
+    view.setUint16(36, 0, true);
+    view.setUint32(38, isDirectory ? 16 : 0, true);
+    view.setUint32(42, offset, true);
+    return new Uint8Array(buffer);
+  }
+
+  function createZipEndRecord(entryCount, centralSize, centralOffset) {
+    const buffer = new ArrayBuffer(22);
+    const view = new DataView(buffer);
+    view.setUint32(0, 0x06054b50, true);
+    view.setUint16(4, 0, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, entryCount, true);
+    view.setUint16(10, entryCount, true);
+    view.setUint32(12, centralSize, true);
+    view.setUint32(16, centralOffset, true);
+    view.setUint16(20, 0, true);
+    return new Uint8Array(buffer);
+  }
+
+  function toDosDateTime(date) {
+    const year = Math.max(date.getFullYear(), 1980);
+    return {
+      date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+      time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+    };
+  }
+
+  function byteLength(parts) {
+    return parts.reduce((total, part) => total + part.length, 0);
+  }
+
+  function buildCrcTable() {
+    const table = new Uint32Array(256);
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+      }
+      table[index] = value >>> 0;
+    }
+    return table;
+  }
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
   }
 })();

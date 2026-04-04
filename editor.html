@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>BIP Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260404-8" />
+  </head>
+  <body class="editor-page">
+    <div class="app-shell app-shell--editor">
+      <header class="top-bar">
+        <div class="top-bar__brand">
+          <svg viewBox="0 0 20 20" width="16" height="16">
+            <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2.2" fill="none" />
+            <circle cx="10" cy="10" r="2.5" fill="currentColor" />
+          </svg>
+          BIP
+        </div>
+        <nav class="page-tabs" aria-label="Pages">
+          <a class="page-tab" href="./index.html">Logger</a>
+          <a class="page-tab page-tab--active" href="./editor.html" aria-current="page">Editor</a>
+        </nav>
+        <div class="top-bar__context">
+          <span class="top-bar__label">Page</span>
+          <span class="top-bar__tag top-bar__tag--activity">Editor</span>
+        </div>
+        <div class="top-bar__right">
+          <span class="state-pill state-pill--paused">Preview</span>
+        </div>
+      </header>
+
+      <main class="editor-main">
+        <section class="editor-card" aria-labelledby="editorTitle">
+          <p class="editor-card__eyebrow">Editor</p>
+          <h1 id="editorTitle" class="editor-card__title">Coming Soon</h1>
+          <p class="editor-card__copy">
+            This page is reserved for the next editing workflow.
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
