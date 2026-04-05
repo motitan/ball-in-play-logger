@@ -610,107 +610,107 @@
 
   function buildCsvContent(snapshot) {
     const headers = [
-      "session_id",
+      "activity_id",
       "activity_name",
-      "record_type",
-      "event_type",
-      "label",
+      "entity_type",
       "task_id",
       "task_name",
       "bip_id",
       "bip_name",
+      "ruck_id",
       "period",
-      "start_elapsed_ms",
-      "end_elapsed_ms",
-      "duration_ms",
-      "event_elapsed_ms",
-      "created_at",
+      "start_time_unix_ms",
+      "end_time_unix_ms",
+      "start_time_seconds",
+      "end_time_seconds",
     ];
-    const rows = buildCsvRows(snapshot).map((row) => headers.map((header) => row[header] ?? ""));
+    const rows = buildExportRows(snapshot).map((row) => headers.map((header) => row[header] ?? ""));
     return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
   }
 
   function buildJsonContent(snapshot) {
-    return `${JSON.stringify(snapshot, null, 2)}\n`;
+    const columns = [
+      "activity_id",
+      "activity_name",
+      "entity_type",
+      "task_id",
+      "task_name",
+      "bip_id",
+      "bip_name",
+      "ruck_id",
+      "period",
+      "start_time_unix_ms",
+      "end_time_unix_ms",
+      "start_time_seconds",
+      "end_time_seconds",
+    ];
+
+    return `${JSON.stringify(
+      {
+        activity_id: snapshot.sessionId,
+        activity_name: snapshot.activityName,
+        exported_at_unix_ms: toUnixMs(snapshot.exportedAt),
+        exported_at_iso: snapshot.exportedAt,
+        columns,
+        rows: buildExportRows(snapshot),
+      },
+      null,
+      2
+    )}\n`;
   }
 
-  function buildCsvRows(snapshot) {
+  function buildExportRows(snapshot) {
     const rows = [];
-    const base = { session_id: snapshot.sessionId, activity_name: snapshot.activityName };
+    const base = { activity_id: snapshot.sessionId, activity_name: snapshot.activityName };
 
     snapshot.tasks.forEach((task) => {
       rows.push({
         ...base,
-        record_type: "task",
-        event_type: "",
-        label: task.name,
+        entity_type: "task",
         task_id: task.id,
         task_name: task.name,
         bip_id: "",
         bip_name: "",
+        ruck_id: "",
         period: task.period,
-        start_elapsed_ms: task.startElapsedMs,
-        end_elapsed_ms: task.effectiveEndElapsedMs,
-        duration_ms: task.durationMs,
-        event_elapsed_ms: "",
-        created_at: task.createdAt,
+        start_time_unix_ms: getTaskStartUnixMs(task),
+        end_time_unix_ms: getTaskEndUnixMs(task, snapshot.exportedAt),
+        start_time_seconds: formatSeconds(task.startElapsedMs),
+        end_time_seconds: formatSeconds(task.effectiveEndElapsedMs),
       });
 
       task.bips.forEach((bip) => {
         rows.push({
           ...base,
-          record_type: "bip",
-          event_type: "",
-          label: bip.label,
+          entity_type: "bip",
           task_id: task.id,
           task_name: task.name,
           bip_id: bip.id,
           bip_name: bip.label,
+          ruck_id: "",
           period: bip.period,
-          start_elapsed_ms: bip.startElapsedMs,
-          end_elapsed_ms: bip.effectiveEndElapsedMs,
-          duration_ms: bip.durationMs,
-          event_elapsed_ms: "",
-          created_at: bip.createdAt,
+          start_time_unix_ms: getBipStartUnixMs(bip),
+          end_time_unix_ms: getBipEndUnixMs(bip, snapshot.exportedAt),
+          start_time_seconds: formatSeconds(bip.startElapsedMs),
+          end_time_seconds: formatSeconds(bip.effectiveEndElapsedMs),
         });
       });
 
       task.rucks.forEach((ruck) => {
         rows.push({
           ...base,
-          record_type: "ruck",
-          event_type: "ruck",
-          label: "Ruck",
+          entity_type: "ruck",
           task_id: task.id,
           task_name: task.name,
           bip_id: ruck.bipId || "",
           bip_name: getBipName(task, ruck.bipId),
+          ruck_id: ruck.id,
           period: ruck.period,
-          start_elapsed_ms: "",
-          end_elapsed_ms: "",
-          duration_ms: "",
-          event_elapsed_ms: ruck.elapsedMs,
-          created_at: ruck.createdAt,
+          start_time_unix_ms: getRuckUnixMs(ruck),
+          end_time_unix_ms: getRuckUnixMs(ruck),
+          start_time_seconds: formatSeconds(ruck.elapsedMs),
+          end_time_seconds: formatSeconds(ruck.elapsedMs),
         });
-      });
-    });
-
-    snapshot.events.forEach((eventItem) => {
-      rows.push({
-        ...base,
-        record_type: "event",
-        event_type: eventItem.type,
-        label: eventItem.label,
-        task_id: eventItem.taskId || "",
-        task_name: eventItem.taskName || "",
-        bip_id: eventItem.bipId || "",
-        bip_name: eventItem.bipName || "",
-        period: eventItem.period,
-        start_elapsed_ms: "",
-        end_elapsed_ms: "",
-        duration_ms: "",
-        event_elapsed_ms: eventItem.elapsedMs,
-        created_at: eventItem.createdAt,
       });
     });
 
@@ -968,6 +968,26 @@
       }),
       rucks: task.rucks.map((ruck) => ({ ...ruck })),
     };
+  }
+
+  function getTaskStartUnixMs(task) {
+    return toUnixMs(task.createdAt);
+  }
+
+  function getTaskEndUnixMs(task, fallbackIso) {
+    return toUnixMs(task.closedAt || fallbackIso);
+  }
+
+  function getBipStartUnixMs(bip) {
+    return toUnixMs(bip.createdAt);
+  }
+
+  function getBipEndUnixMs(bip, fallbackIso) {
+    return toUnixMs(bip.closedAt || fallbackIso);
+  }
+
+  function getRuckUnixMs(ruck) {
+    return toUnixMs(ruck.createdAt);
   }
 
   function getViewSnapshot() {
@@ -1504,6 +1524,15 @@
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
     return base || "activity";
+  }
+
+  function toUnixMs(value) {
+    const unixMs = Date.parse(value);
+    return Number.isFinite(unixMs) ? unixMs : "";
+  }
+
+  function formatSeconds(value) {
+    return (normMs(value) / 1000).toFixed(2);
   }
 
   function csvEscape(value) {
