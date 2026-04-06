@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
+  const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
   const DEFAULT_PERIOD = "";
   const DEFAULT_ACTIVITY = "Activity";
   const EXPORT_PERIOD = "Untitled Period";
@@ -91,7 +92,7 @@
     el.reviewExportZipBtn.addEventListener("click", exportBundleZip);
 
     window.addEventListener("storage", (event) => {
-      if (event.key && event.key !== STORAGE_KEY) {
+      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
         return;
       }
       refreshSession();
@@ -159,21 +160,20 @@
   }
 
   function renderBucketList(buckets) {
-    const maxCount = Math.max(0, ...buckets.map((bucket) => bucket.count));
-    return buckets
-      .map((bucket) => {
-        const width = maxCount > 0 ? `${(bucket.count / maxCount) * 100}%` : "0%";
-        return `
-          <div class="bucket-row">
-            <span class="bucket-row__label">${esc(bucket.label)}</span>
-            <div class="bucket-row__track">
-              <span class="bucket-row__fill" style="--fill-width:${width};"></span>
-            </div>
-            <span class="bucket-row__value">${bucket.count}</span>
-          </div>
-        `;
-      })
-      .join("");
+    return `
+      <div class="bucket-strip" style="--bucket-count:${buckets.length};">
+        ${buckets
+          .map(
+            (bucket) => `
+              <div class="bucket-chip">
+                <span class="bucket-chip__label">${esc(bucket.label)}</span>
+                <strong class="bucket-chip__value">${bucket.count}</strong>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    `;
   }
 
   function renderTaskTable(snapshot) {
@@ -698,11 +698,40 @@
 
   function loadSession() {
     try {
+      const reviewSource = loadEditorReviewSource();
+      if (reviewSource) {
+        return reviewSource;
+      }
+
       const raw = localStorage.getItem(STORAGE_KEY);
       return raw ? normalizeSession(JSON.parse(raw)) : createSession();
     } catch (error) {
       console.error("Unable to load session", error);
       return createSession();
+    }
+  }
+
+  function loadEditorReviewSource() {
+    try {
+      const raw = localStorage.getItem(REVIEW_SOURCE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      const candidate =
+        parsed && typeof parsed === "object" && parsed.session && typeof parsed.session === "object"
+          ? parsed.session
+          : parsed;
+
+      if (!candidate || typeof candidate !== "object" || !Array.isArray(candidate.tasks) || !candidate.tasks.length) {
+        return null;
+      }
+
+      return normalizeSession(candidate);
+    } catch (error) {
+      console.error("Unable to load review source", error);
+      return null;
     }
   }
 

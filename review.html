@@ -13,7 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260406-7" />
+    <link rel="stylesheet" href="./styles.css?v=20260406-14" />
   </head>
   <body class="review-page">
     <div class="app-shell app-shell--review">
@@ -40,52 +40,54 @@
       </header>
 
       <main class="review-main">
-        <section class="review-hero">
-          <div class="review-hero__copy">
-            <p class="review-eyebrow">Current Session Review</p>
-            <h1 id="reviewTitle" class="review-title">No active session</h1>
-            <div class="review-meta">
-              <span id="reviewDate">Start a session in Logger to see the review.</span>
-              <span id="reviewWindow">Awaiting drill data</span>
+        <section class="review-overview">
+          <section class="review-hero">
+            <div class="review-hero__copy">
+              <p class="review-eyebrow">Current Session Review</p>
+              <h1 id="reviewTitle" class="review-title">No active session</h1>
+              <div class="review-meta">
+                <span id="reviewDate">Start a session in Logger to see the review.</span>
+                <span id="reviewWindow">Awaiting drill data</span>
+              </div>
             </div>
-          </div>
-          <div class="review-hero__side">
-            <div class="review-actions">
-              <button id="reviewExportCsvBtn" class="export-btn" type="button">CSV</button>
-              <button id="reviewExportJsonBtn" class="export-btn" type="button">JSON</button>
-              <button id="reviewExportZipBtn" class="export-btn" type="button">ZIP</button>
+            <div class="review-hero__side">
+              <div class="review-actions">
+                <button id="reviewExportCsvBtn" class="export-btn" type="button">CSV</button>
+                <button id="reviewExportJsonBtn" class="export-btn" type="button">JSON</button>
+                <button id="reviewExportZipBtn" class="export-btn" type="button">ZIP</button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="review-kpis" aria-label="Session metrics">
-          <article class="review-kpi review-kpi--work">
-            <p class="review-kpi__label">Work</p>
-            <strong id="kpiWork" class="review-kpi__value">00:00</strong>
-            <span class="review-kpi__meta">Total ball in play</span>
-          </article>
-          <article class="review-kpi review-kpi--rest">
-            <p class="review-kpi__label">Rest</p>
-            <strong id="kpiRest" class="review-kpi__value">00:00</strong>
-            <span class="review-kpi__meta">Dead ball / recovery</span>
-          </article>
-          <article class="review-kpi review-kpi--ratio review-kpi--gauge">
-            <p class="review-kpi__label">Ratio</p>
-            <div id="ratioGauge" class="ratio-gauge" style="--ratio: 0deg;">
-              <span id="kpiRatio" class="ratio-gauge__value">0%</span>
-            </div>
-            <span class="review-kpi__meta">Work to active window</span>
-          </article>
-          <article class="review-kpi review-kpi--phase">
-            <p class="review-kpi__label">Phases</p>
-            <strong id="kpiPhases" class="review-kpi__value">0</strong>
-            <span class="review-kpi__meta">Total rucks</span>
-          </article>
-          <article class="review-kpi review-kpi--clock">
-            <p class="review-kpi__label">Clock</p>
-            <strong id="kpiClock" class="review-kpi__value">00:00:00</strong>
-            <span class="review-kpi__meta">Session timer</span>
-          </article>
+          <section class="review-kpis" aria-label="Session metrics">
+            <article class="review-kpi review-kpi--work">
+              <p class="review-kpi__label">Work</p>
+              <strong id="kpiWork" class="review-kpi__value">00:00</strong>
+              <span class="review-kpi__meta">Total ball in play</span>
+            </article>
+            <article class="review-kpi review-kpi--rest">
+              <p class="review-kpi__label">Rest</p>
+              <strong id="kpiRest" class="review-kpi__value">00:00</strong>
+              <span class="review-kpi__meta">Dead ball / recovery</span>
+            </article>
+            <article class="review-kpi review-kpi--ratio review-kpi--gauge">
+              <p class="review-kpi__label">Ratio</p>
+              <div id="ratioGauge" class="ratio-gauge" style="--ratio: 0deg;">
+                <span id="kpiRatio" class="ratio-gauge__value">0%</span>
+              </div>
+              <span class="review-kpi__meta">Work to active window</span>
+            </article>
+            <article class="review-kpi review-kpi--phase">
+              <p class="review-kpi__label">Phases</p>
+              <strong id="kpiPhases" class="review-kpi__value">0</strong>
+              <span class="review-kpi__meta">Total rucks</span>
+            </article>
+            <article class="review-kpi review-kpi--clock">
+              <p class="review-kpi__label">Clock</p>
+              <strong id="kpiClock" class="review-kpi__value">00:00:00</strong>
+              <span class="review-kpi__meta">Session timer</span>
+            </article>
+          </section>
         </section>
 
         <section class="review-grid">
@@ -143,6 +145,6 @@
     </div>
 
     <div id="reviewSrStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./review.js?v=20260406-2"></script>
+    <script src="./review.js?v=20260406-4"></script>
   </body>
 </html>

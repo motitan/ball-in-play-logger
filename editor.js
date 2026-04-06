@@ -1,4 +1,6 @@
 (() => {
+  const STORAGE_KEY = "ball-in-play-logger-session-v1";
+  const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
   const EXPORT_COLUMNS = [
     "activity_id",
     "activity_name",
@@ -26,6 +28,8 @@
 
   const RUCK_WINDOW_MS = 1500;
   const MAX_TASK_NAME = 64;
+  const MAX_ACTIVITY = 64;
+  const MAX_PERIOD = 48;
   const DEFAULT_ACTIVITY = "Imported activity";
   const textDecoder = new TextDecoder();
   const textEncoder = new TextEncoder();
@@ -72,10 +76,13 @@
     importSurface: document.querySelector(".editor-import"),
   };
 
-  let state = createEditorState();
+  let state = loadPersistedEditorSource() || createEditorState();
+  let liveSyncTimer = null;
 
   bindEvents();
+  refreshRunningSession(false);
   renderAll();
+  syncLiveTimer();
 
   function bindEvents() {
     el.editorFileInput.addEventListener("change", handleFileInput);
@@ -105,15 +112,37 @@
       el.importSurface.addEventListener("drop", (event) => {
         event.preventDefault();
         el.importSurface.classList.remove("editor-import--dragover");
+        if (state.hasRunningSession) {
+          announce("A live activity is running in Logger. Import is locked until it stops.");
+          return;
+        }
         const [file] = Array.from(event.dataTransfer?.files || []);
         if (file) {
           loadImportFile(file);
         }
       });
     }
+
+    window.addEventListener("storage", (event) => {
+      if (!event.key || event.key === STORAGE_KEY) {
+        refreshRunningSession(true);
+      }
+    });
+
+    window.addEventListener("focus", () => refreshRunningSession(false));
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        refreshRunningSession(false);
+      }
+    });
   }
 
   async function handleFileInput(event) {
+    if (state.hasRunningSession) {
+      event.target.value = "";
+      announce("A live activity is running in Logger. Import is locked until it stops.");
+      return;
+    }
     const [file] = Array.from(event.target.files || []);
     if (!file) {
       return;
@@ -123,9 +152,17 @@
   }
 
   async function loadImportFile(file) {
+    if (state.hasRunningSession) {
+      announce("A live activity is running in Logger. Import is locked until it stops.");
+      return;
+    }
     try {
       const payload = await parseImportFile(file);
       state = buildEditorState(payload, file.name);
+      state.sourceMode = "file";
+      state.hasRunningSession = false;
+      state.runningActivityId = null;
+      state.runningActivityName = "";
       renderAll();
       announce(`${file.name} imported into Editor.`);
     } catch (error) {
@@ -372,6 +409,194 @@
       selectedTaskId: orderedTasks[0]?.id || null,
       originUnixMs,
       dirty: false,
+      sourceMode: "file",
+      hasRunningSession: false,
+      runningActivityId: null,
+      runningActivityName: "",
+    };
+  }
+
+  function refreshRunningSession(announceOnSwitch) {
+    const liveSession = loadLiveSession();
+    const isRunning = isRunningLiveSession(liveSession);
+
+    if (!isRunning) {
+      if (state.sourceMode === "live") {
+        state = loadPersistedEditorSource(state.selectedTaskId) || createEditorState();
+      } else {
+        state.hasRunningSession = false;
+        state.runningActivityId = null;
+        state.runningActivityName = "";
+      }
+      renderAll();
+      syncLiveTimer();
+      return;
+    }
+
+    const nextActivityId = liveSession.sessionId;
+    const isDifferentLiveActivity = state.runningActivityId && state.runningActivityId !== nextActivityId;
+    const shouldHydrate =
+      state.sourceMode !== "live" ||
+      isDifferentLiveActivity ||
+      !state.dirty;
+
+    if (shouldHydrate) {
+      const previousSourceMode = state.sourceMode;
+      state = buildEditorStateFromLiveSession(liveSession, state.selectedTaskId);
+      if (announceOnSwitch || previousSourceMode !== "live") {
+        announce(`Showing current running activity: ${state.activityName}.`);
+      }
+    } else {
+      state.hasRunningSession = true;
+      state.runningActivityId = nextActivityId;
+      state.runningActivityName = activityLabel(liveSession.activityName);
+    }
+
+    renderAll();
+    syncLiveTimer();
+  }
+
+  function buildEditorStateFromLiveSession(session, preferredTaskId) {
+    const currentElapsedMs = getCurrentElapsedMs(session);
+    const nowIso = new Date().toISOString();
+    const tasks = session.tasks
+      .map((task, index) => {
+        const endMs = task.endElapsedMs == null ? currentElapsedMs : task.endElapsedMs;
+        return {
+          id: task.id,
+          name: taskName(task.name, index + 1),
+          startMs: normMs(task.startElapsedMs),
+          endMs,
+          startUnixMs: toUnixMs(task.createdAt),
+          endUnixMs: toUnixMs(task.closedAt || nowIso),
+          bips: task.bips
+            .map((bip, bipIndex) => ({
+              id: bip.id,
+              label: bipLabel(bip.label, bipIndex + 1),
+              startMs: normMs(bip.startElapsedMs),
+              endMs: bip.endElapsedMs == null ? currentElapsedMs : bip.endElapsedMs,
+              startUnixMs: toUnixMs(bip.createdAt),
+              endUnixMs: toUnixMs(bip.closedAt || nowIso),
+            }))
+            .sort((left, right) => left.startMs - right.startMs),
+          rucks: task.rucks
+            .map((ruck) => ({
+              id: ruck.id,
+              bipId: toText(ruck.bipId),
+              timeMs: normMs(ruck.elapsedMs),
+              timeUnixMs: toUnixMs(ruck.createdAt),
+            }))
+            .sort((left, right) => left.timeMs - right.timeMs),
+        };
+      })
+      .sort((left, right) => {
+        if (left.startMs !== right.startMs) {
+          return left.startMs - right.startMs;
+        }
+        return left.name.localeCompare(right.name);
+      });
+
+    const originUnixMs = deriveOriginUnixMsFromTasks(tasks);
+    tasks.forEach((task) => {
+      if (task.startUnixMs === "" || task.endUnixMs === "") {
+        syncTaskUnixBounds(task, originUnixMs);
+      }
+    });
+
+    const nextSelectedTaskId =
+      preferredTaskId && tasks.some((task) => task.id === preferredTaskId)
+        ? preferredTaskId
+        : tasks[0]?.id || null;
+
+    return {
+      activityId: session.sessionId,
+      activityName: activityLabel(session.activityName),
+      sourceName: "Current activity from Logger",
+      sourceType: "LIVE",
+      importedAtIso: nowIso,
+      exportedAtIso: nowIso,
+      rowCount: countDerivedRows(tasks),
+      tasks,
+      selectedTaskId: nextSelectedTaskId,
+      originUnixMs,
+      dirty: false,
+      sourceMode: "live",
+      hasRunningSession: true,
+      runningActivityId: session.sessionId,
+      runningActivityName: activityLabel(session.activityName),
+    };
+  }
+
+  function buildEditorStateFromStoredSession(session, payload, preferredTaskId) {
+    const currentElapsedMs = getCurrentElapsedMs(session);
+    const nowIso = toText(payload.updatedAt) || new Date().toISOString();
+    const tasks = session.tasks
+      .map((task, index) => {
+        const endMs = task.endElapsedMs == null ? currentElapsedMs : task.endElapsedMs;
+        return {
+          id: task.id,
+          name: taskName(task.name, index + 1),
+          startMs: normMs(task.startElapsedMs),
+          endMs,
+          startUnixMs: toUnixMs(task.createdAt),
+          endUnixMs: toUnixMs(task.closedAt || nowIso),
+          bips: task.bips
+            .map((bip, bipIndex) => ({
+              id: bip.id,
+              label: bipLabel(bip.label, bipIndex + 1),
+              startMs: normMs(bip.startElapsedMs),
+              endMs: bip.endElapsedMs == null ? currentElapsedMs : bip.endElapsedMs,
+              startUnixMs: toUnixMs(bip.createdAt),
+              endUnixMs: toUnixMs(bip.closedAt || nowIso),
+            }))
+            .sort((left, right) => left.startMs - right.startMs),
+          rucks: task.rucks
+            .map((ruck) => ({
+              id: ruck.id,
+              bipId: toText(ruck.bipId),
+              timeMs: normMs(ruck.elapsedMs),
+              timeUnixMs: toUnixMs(ruck.createdAt),
+            }))
+            .sort((left, right) => left.timeMs - right.timeMs),
+        };
+      })
+      .sort((left, right) => {
+        if (left.startMs !== right.startMs) {
+          return left.startMs - right.startMs;
+        }
+        return left.name.localeCompare(right.name);
+      });
+
+    const originUnixMs = deriveOriginUnixMsFromTasks(tasks);
+    tasks.forEach((task) => {
+      if (task.startUnixMs === "" || task.endUnixMs === "") {
+        syncTaskUnixBounds(task, originUnixMs);
+      }
+    });
+
+    const nextSelectedTaskId =
+      preferredTaskId && tasks.some((task) => task.id === preferredTaskId)
+        ? preferredTaskId
+        : toText(payload.selectedTaskId) && tasks.some((task) => task.id === payload.selectedTaskId)
+          ? payload.selectedTaskId
+          : tasks[0]?.id || null;
+
+    return {
+      activityId: session.sessionId,
+      activityName: activityLabel(session.activityName),
+      sourceName: toText(payload.sourceName) || "Restored activity from Editor",
+      sourceType: toText(payload.sourceType) || "EDITOR",
+      importedAtIso: toText(payload.importedAtIso) || nowIso,
+      exportedAtIso: toText(payload.exportedAtIso) || nowIso,
+      rowCount: countDerivedRows(tasks),
+      tasks,
+      selectedTaskId: nextSelectedTaskId,
+      originUnixMs,
+      dirty: payload.dirty === true,
+      sourceMode: "file",
+      hasRunningSession: false,
+      runningActivityId: null,
+      runningActivityName: "",
     };
   }
 
@@ -532,25 +757,39 @@
     renderTimeline();
     renderTaskTable();
     syncExportButtons();
+    syncImportState();
+    syncReviewSourceStorage();
   }
 
   function renderHeader() {
     const hasData = state.tasks.length > 0;
-    const status = !hasData ? "Idle" : state.dirty ? "Edited" : "Loaded";
+    const status = !hasData
+      ? "Idle"
+      : state.hasRunningSession && state.sourceMode === "live" && !state.dirty
+        ? "Running"
+        : state.dirty
+          ? "Edited"
+          : "Loaded";
 
     document.title = hasData ? `${state.activityName} — BIP Editor` : "BIP Editor";
     el.editorTopActivity.textContent = hasData ? state.activityName : "Import export file";
     el.editorTopStatus.textContent = status;
-    el.editorTopStatus.classList.toggle("state-pill--running", status === "Loaded");
+    el.editorTopStatus.classList.toggle("state-pill--running", status === "Running" || (status === "Loaded" && state.sourceMode === "live"));
     el.editorTopStatus.classList.toggle("state-pill--paused", status === "Idle");
     el.editorTopStatus.classList.toggle("state-pill--finished", status === "Edited");
 
     el.editorTitle.textContent = hasData ? state.activityName : "No imported session yet";
     el.editorMetaSource.textContent = hasData
-      ? `${state.sourceName} · ${state.sourceType} · ${state.rowCount} flat rows`
-      : "Load a CSV, JSON, or ZIP export from the logger.";
+      ? state.hasRunningSession && state.sourceMode === "live"
+        ? `${state.sourceName} · imports locked while Logger is running · ${state.rowCount} flat rows`
+        : `${state.sourceName} · ${state.sourceType} · ${state.rowCount} flat rows`
+      : state.hasRunningSession
+        ? "A live activity is running in Logger and is shown here automatically."
+        : "Load a CSV, JSON, or ZIP export from the logger.";
     el.editorMetaWindow.textContent = hasData
-      ? `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks · imported ${formatReviewDate(state.importedAtIso)}`
+      ? state.sourceMode === "live"
+        ? `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks · synced from Logger`
+        : `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks · imported ${formatReviewDate(state.importedAtIso)}`
       : "Task timing edits stay in the editor until you export again.";
   }
 
@@ -877,6 +1116,38 @@
     el.alignBothAllBtn.disabled = disabled;
   }
 
+  function syncImportState() {
+    const locked = state.hasRunningSession;
+    if (el.editorFileInput) {
+      el.editorFileInput.disabled = locked;
+    }
+    if (!el.importSurface) {
+      return;
+    }
+
+    el.importSurface.classList.toggle("editor-import--disabled", locked);
+    el.importSurface.setAttribute("aria-disabled", String(locked));
+    el.importSurface.title = locked
+      ? `Logger is running ${state.runningActivityName || "an activity"}. File import is locked.`
+      : "Load an exported CSV, JSON, or ZIP bundle.";
+
+    const title = el.importSurface.querySelector(".editor-import__title");
+    const copy = el.importSurface.querySelector(".editor-import__copy");
+    const cta = el.importSurface.querySelector(".editor-import__cta");
+
+    if (title) {
+      title.textContent = locked ? "Live activity connected" : "Drop CSV, JSON, or ZIP";
+    }
+    if (copy) {
+      copy.textContent = locked
+        ? "Editor is showing the current running activity from Logger. Stop or finish it there before loading another file."
+        : "The editor reconstructs tasks, BIPs, and rucks from exported rows. No live logging controls are available here.";
+    }
+    if (cta) {
+      cta.textContent = locked ? "Live source" : "Choose file";
+    }
+  }
+
   function selectedTask() {
     return state.tasks.find((task) => task.id === state.selectedTaskId) || null;
   }
@@ -1102,7 +1373,303 @@
       selectedTaskId: null,
       originUnixMs: 0,
       dirty: false,
+      sourceMode: "none",
+      hasRunningSession: false,
+      runningActivityId: null,
+      runningActivityName: "",
     };
+  }
+
+  function loadPersistedEditorSource(preferredTaskId = null) {
+    try {
+      const raw = localStorage.getItem(REVIEW_SOURCE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || parsed.source !== "editor") {
+        return null;
+      }
+
+      const session = normalizeLiveSession(parsed.session);
+      if (!Array.isArray(session.tasks) || !session.tasks.length) {
+        return null;
+      }
+
+      return buildEditorStateFromStoredSession(session, parsed, preferredTaskId);
+    } catch (error) {
+      console.error("Unable to restore Editor source", error);
+      return null;
+    }
+  }
+
+  function syncReviewSourceStorage() {
+    try {
+      if (!shouldPublishReviewSource()) {
+        if (state.sourceMode === "live") {
+          localStorage.removeItem(REVIEW_SOURCE_KEY);
+        }
+        return;
+      }
+
+      localStorage.setItem(
+        REVIEW_SOURCE_KEY,
+        JSON.stringify({
+          source: "editor",
+          updatedAt: new Date().toISOString(),
+          sourceName: state.sourceName,
+          sourceType: state.sourceType,
+          importedAtIso: state.importedAtIso,
+          exportedAtIso: state.exportedAtIso,
+          selectedTaskId: state.selectedTaskId,
+          dirty: state.dirty,
+          session: buildReviewSourceSession(),
+        })
+      );
+    } catch (error) {
+      console.error("Unable to sync review source from Editor", error);
+    }
+  }
+
+  function shouldPublishReviewSource() {
+    return state.tasks.length > 0 && (state.sourceMode === "file" || state.dirty);
+  }
+
+  function buildReviewSourceSession() {
+    const tasks = state.tasks.map((task) => ({
+      id: task.id,
+      name: task.name,
+      period: "",
+      startElapsedMs: task.startMs,
+      endElapsedMs: task.endMs,
+      createdAt: unixMsToIso(resolveTaskStartUnixMs(task)),
+      closedAt: unixMsToIso(resolveTaskEndUnixMs(task)),
+      bips: task.bips.map((bip) => ({
+        id: bip.id,
+        label: bip.label,
+        period: "",
+        startElapsedMs: bip.startMs,
+        endElapsedMs: bip.endMs,
+        createdAt: unixMsToIso(resolveBipStartUnixMs(bip)),
+        closedAt: unixMsToIso(resolveBipEndUnixMs(bip)),
+      })),
+      rucks: task.rucks.map((ruck) => ({
+        id: ruck.id,
+        elapsedMs: ruck.timeMs,
+        createdAt: unixMsToIso(resolveRuckUnixMs(ruck)),
+        bipId: toText(ruck.bipId) || null,
+      })),
+    }));
+
+    const createdAt = tasks[0]?.createdAt || state.importedAtIso || new Date().toISOString();
+    const elapsedMs = Math.max(0, ...tasks.map((task) => task.endElapsedMs));
+
+    return {
+      sessionId: state.activityId || createId(),
+      createdAt,
+      activityName: state.activityName,
+      currentPeriod: "",
+      taskNameDraft: "",
+      clockState: "paused",
+      elapsedMs,
+      lastStartedAt: null,
+      activeTaskId: null,
+      activeBipId: null,
+      isFinished: false,
+      finishedAt: null,
+      tasks,
+      events: [],
+    };
+  }
+
+  function loadLiveSession() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? normalizeLiveSession(JSON.parse(raw)) : createLiveSession();
+    } catch (error) {
+      console.error("Unable to load running session for Editor", error);
+      return createLiveSession();
+    }
+  }
+
+  function createLiveSession() {
+    return {
+      sessionId: createId(),
+      createdAt: new Date().toISOString(),
+      activityName: "",
+      currentPeriod: "",
+      taskNameDraft: "",
+      clockState: "paused",
+      elapsedMs: 0,
+      lastStartedAt: null,
+      activeTaskId: null,
+      activeBipId: null,
+      isFinished: false,
+      finishedAt: null,
+      tasks: [],
+      events: [],
+    };
+  }
+
+  function normalizeLiveSession(raw) {
+    if (!raw || typeof raw !== "object") {
+      return createLiveSession();
+    }
+
+    const base = createLiveSession();
+    const nextSession = {
+      sessionId: toText(raw.sessionId) || base.sessionId,
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : base.createdAt,
+      activityName: typeof raw.activityName === "string" ? raw.activityName.slice(0, MAX_ACTIVITY) : base.activityName,
+      currentPeriod: typeof raw.currentPeriod === "string" ? raw.currentPeriod.slice(0, MAX_PERIOD) : base.currentPeriod,
+      taskNameDraft: typeof raw.taskNameDraft === "string" ? raw.taskNameDraft : base.taskNameDraft,
+      clockState: raw.clockState === "running" ? "running" : "paused",
+      elapsedMs: normMs(raw.elapsedMs),
+      lastStartedAt: isValidDate(raw.lastStartedAt) ? raw.lastStartedAt : null,
+      activeTaskId: toText(raw.activeTaskId) || null,
+      activeBipId: toText(raw.activeBipId) || null,
+      isFinished: raw.isFinished === true,
+      finishedAt: isValidDate(raw.finishedAt) ? raw.finishedAt : null,
+      tasks: Array.isArray(raw.tasks) ? raw.tasks.map(normalizeLiveTask).filter(Boolean) : [],
+      events: Array.isArray(raw.events) ? raw.events : [],
+    };
+
+    if (nextSession.clockState === "paused") {
+      nextSession.lastStartedAt = null;
+    }
+
+    if (nextSession.clockState === "running" && !nextSession.lastStartedAt) {
+      nextSession.clockState = "paused";
+    }
+
+    if (nextSession.clockState === "running" && !hasValue(nextSession.activityName)) {
+      nextSession.clockState = "paused";
+      nextSession.lastStartedAt = null;
+    }
+
+    if (nextSession.isFinished) {
+      nextSession.clockState = "paused";
+      nextSession.lastStartedAt = null;
+      nextSession.activeTaskId = null;
+      nextSession.activeBipId = null;
+    }
+
+    return nextSession;
+  }
+
+  function normalizeLiveTask(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: toText(raw.id) || createId(),
+      name: taskName(raw.name, 1),
+      startElapsedMs: normMs(raw.startElapsedMs),
+      endElapsedMs: raw.endElapsedMs == null ? null : normMs(raw.endElapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      closedAt: isValidDate(raw.closedAt) ? raw.closedAt : null,
+      bips: Array.isArray(raw.bips) ? raw.bips.map(normalizeLiveBip).filter(Boolean) : [],
+      rucks: Array.isArray(raw.rucks) ? raw.rucks.map(normalizeLiveRuck).filter(Boolean) : [],
+    };
+  }
+
+  function normalizeLiveBip(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: toText(raw.id) || createId(),
+      label: bipLabel(raw.label, 1),
+      startElapsedMs: normMs(raw.startElapsedMs),
+      endElapsedMs: raw.endElapsedMs == null ? null : normMs(raw.endElapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      closedAt: isValidDate(raw.closedAt) ? raw.closedAt : null,
+    };
+  }
+
+  function normalizeLiveRuck(raw) {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    return {
+      id: toText(raw.id) || createId(),
+      elapsedMs: normMs(raw.elapsedMs),
+      createdAt: isValidDate(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
+      bipId: toText(raw.bipId),
+    };
+  }
+
+  function isRunningLiveSession(session) {
+    return session.clockState === "running" && !session.isFinished && hasValue(session.activityName);
+  }
+
+  function getCurrentElapsedMs(session, now = new Date()) {
+    const baseElapsedMs = normMs(session.elapsedMs);
+    if (session.clockState !== "running" || !session.lastStartedAt) {
+      return baseElapsedMs;
+    }
+
+    const startedAtMs = Date.parse(session.lastStartedAt);
+    if (!Number.isFinite(startedAtMs)) {
+      return baseElapsedMs;
+    }
+
+    return baseElapsedMs + Math.max(0, now.getTime() - startedAtMs);
+  }
+
+  function deriveOriginUnixMsFromTasks(tasks) {
+    const candidates = [];
+
+    tasks.forEach((task) => {
+      if (task.startUnixMs !== "") {
+        candidates.push(task.startUnixMs - task.startMs);
+      }
+      task.bips.forEach((bip) => {
+        if (bip.startUnixMs !== "") {
+          candidates.push(bip.startUnixMs - bip.startMs);
+        }
+      });
+      task.rucks.forEach((ruck) => {
+        if (ruck.timeUnixMs !== "") {
+          candidates.push(ruck.timeUnixMs - ruck.timeMs);
+        }
+      });
+    });
+
+    if (candidates.length) {
+      candidates.sort((left, right) => left - right);
+      return Math.round(candidates[Math.floor(candidates.length / 2)]);
+    }
+
+    return Date.now();
+  }
+
+  function countDerivedRows(tasks) {
+    return tasks.reduce((sum, task) => sum + 1 + task.bips.length + task.rucks.length, 0);
+  }
+
+  function resolveTaskStartUnixMs(task) {
+    return task.startUnixMs !== "" ? task.startUnixMs : Math.max(0, state.originUnixMs + task.startMs);
+  }
+
+  function resolveTaskEndUnixMs(task) {
+    return task.endUnixMs !== "" ? task.endUnixMs : Math.max(resolveTaskStartUnixMs(task), state.originUnixMs + task.endMs);
+  }
+
+  function resolveBipStartUnixMs(bip) {
+    return bip.startUnixMs !== "" ? bip.startUnixMs : Math.max(0, state.originUnixMs + bip.startMs);
+  }
+
+  function resolveBipEndUnixMs(bip) {
+    return bip.endUnixMs !== "" ? bip.endUnixMs : Math.max(resolveBipStartUnixMs(bip), state.originUnixMs + bip.endMs);
+  }
+
+  function resolveRuckUnixMs(ruck) {
+    return ruck.timeUnixMs !== "" ? ruck.timeUnixMs : Math.max(0, state.originUnixMs + ruck.timeMs);
   }
 
   function normalizeRowShape(row) {
@@ -1121,9 +1688,26 @@
     return String(value ?? "").trim();
   }
 
+  function hasValue(value) {
+    return Boolean(toText(value));
+  }
+
+  function activityLabel(value) {
+    return toText(value) || DEFAULT_ACTIVITY;
+  }
+
   function unixValue(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? Math.round(parsed) : "";
+  }
+
+  function toUnixMs(value) {
+    const unixMs = Date.parse(value);
+    return Number.isFinite(unixMs) ? unixMs : "";
+  }
+
+  function unixMsToIso(value) {
+    return value === "" ? new Date().toISOString() : new Date(value).toISOString();
   }
 
   function secondsValue(value) {
@@ -1222,6 +1806,11 @@
     return String(Math.max(0, Math.trunc(value))).padStart(2, "0");
   }
 
+  function normMs(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0;
+  }
+
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
@@ -1237,5 +1826,24 @@
 
   function createId() {
     return window.crypto?.randomUUID?.() ?? `s-${Date.now()}-${Math.floor(Math.random() * 1e5)}`;
+  }
+
+  function isValidDate(value) {
+    return typeof value === "string" && Number.isFinite(Date.parse(value));
+  }
+
+  function syncLiveTimer() {
+    const shouldRun = state.hasRunningSession && state.sourceMode === "live" && !state.dirty;
+    if (shouldRun && !liveSyncTimer) {
+      liveSyncTimer = window.setInterval(() => {
+        refreshRunningSession(false);
+      }, 1000);
+      return;
+    }
+
+    if (!shouldRun && liveSyncTimer) {
+      window.clearInterval(liveSyncTimer);
+      liveSyncTimer = null;
+    }
   }
 })();
