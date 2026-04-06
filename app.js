@@ -6,6 +6,7 @@
   const PROMPT_PERIOD = "Name period";
   const EXPORT_PERIOD = "Untitled Period";
   const CLOCK_TICK_MS = 250;
+  const RUCK_WINDOW_MS = 1500;
 
   const MAX_ACTIVITY = 64;
   const MAX_PERIOD = 48;
@@ -618,11 +619,20 @@
       "bip_id",
       "bip_name",
       "ruck_id",
-      "period",
+      "ruck_count",
       "start_time_unix_ms",
       "end_time_unix_ms",
       "start_time_seconds",
       "end_time_seconds",
+      "ruck_time_unix_ms",
+      "ruck_start_time_unix_ms",
+      "ruck_end_time_unix_ms",
+      "ruck_time_seconds",
+      "ruck_start_time_seconds",
+      "ruck_end_time_seconds",
+      "duration_seconds",
+      "pre_dead_ball_seconds",
+      "post_dead_ball_seconds",
     ];
     const rows = buildExportRows(snapshot).map((row) => headers.map((header) => row[header] ?? ""));
     return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -638,11 +648,20 @@
       "bip_id",
       "bip_name",
       "ruck_id",
-      "period",
+      "ruck_count",
       "start_time_unix_ms",
       "end_time_unix_ms",
       "start_time_seconds",
       "end_time_seconds",
+      "ruck_time_unix_ms",
+      "ruck_start_time_unix_ms",
+      "ruck_end_time_unix_ms",
+      "ruck_time_seconds",
+      "ruck_start_time_seconds",
+      "ruck_end_time_seconds",
+      "duration_seconds",
+      "pre_dead_ball_seconds",
+      "post_dead_ball_seconds",
     ];
 
     return `${JSON.stringify(
@@ -662,6 +681,7 @@
   function buildExportRows(snapshot) {
     const rows = [];
     const base = { activity_id: snapshot.sessionId, activity_name: snapshot.activityName };
+    const bipDeadBallById = buildBipDeadBallById(snapshot);
 
     snapshot.tasks.forEach((task) => {
       rows.push({
@@ -672,11 +692,20 @@
         bip_id: "",
         bip_name: "",
         ruck_id: "",
-        period: task.period,
         start_time_unix_ms: getTaskStartUnixMs(task),
         end_time_unix_ms: getTaskEndUnixMs(task, snapshot.exportedAt),
         start_time_seconds: formatSeconds(task.startElapsedMs),
         end_time_seconds: formatSeconds(task.effectiveEndElapsedMs),
+        ruck_time_unix_ms: "",
+        ruck_start_time_unix_ms: "",
+        ruck_end_time_unix_ms: "",
+        ruck_time_seconds: "",
+        ruck_start_time_seconds: "",
+        ruck_end_time_seconds: "",
+        duration_seconds: formatSeconds(task.durationMs),
+        ruck_count: String(task.rucks.length),
+        pre_dead_ball_seconds: "",
+        post_dead_ball_seconds: "",
       });
 
       task.bips.forEach((bip) => {
@@ -688,11 +717,20 @@
           bip_id: bip.id,
           bip_name: bip.label,
           ruck_id: "",
-          period: bip.period,
           start_time_unix_ms: getBipStartUnixMs(bip),
           end_time_unix_ms: getBipEndUnixMs(bip, snapshot.exportedAt),
           start_time_seconds: formatSeconds(bip.startElapsedMs),
           end_time_seconds: formatSeconds(bip.effectiveEndElapsedMs),
+          ruck_time_unix_ms: "",
+          ruck_start_time_unix_ms: "",
+          ruck_end_time_unix_ms: "",
+          ruck_time_seconds: "",
+          ruck_start_time_seconds: "",
+          ruck_end_time_seconds: "",
+          duration_seconds: formatSeconds(bip.durationMs),
+          ruck_count: String(countBipRucks(task, bip.id)),
+          pre_dead_ball_seconds: bipDeadBallById.get(bip.id)?.pre_dead_ball_seconds || "",
+          post_dead_ball_seconds: bipDeadBallById.get(bip.id)?.post_dead_ball_seconds || "",
         });
       });
 
@@ -705,16 +743,59 @@
           bip_id: ruck.bipId || "",
           bip_name: getBipName(task, ruck.bipId),
           ruck_id: ruck.id,
-          period: ruck.period,
           start_time_unix_ms: getRuckUnixMs(ruck),
           end_time_unix_ms: getRuckUnixMs(ruck),
           start_time_seconds: formatSeconds(ruck.elapsedMs),
           end_time_seconds: formatSeconds(ruck.elapsedMs),
+          ruck_time_unix_ms: getRuckTimeUnixMs(ruck),
+          ruck_start_time_unix_ms: getRuckStartUnixMs(ruck),
+          ruck_end_time_unix_ms: getRuckEndUnixMs(ruck),
+          ruck_time_seconds: formatSeconds(ruck.elapsedMs),
+          ruck_start_time_seconds: getRuckStartSeconds(ruck),
+          ruck_end_time_seconds: getRuckEndSeconds(ruck),
+          duration_seconds: formatSeconds(0),
+          ruck_count: "",
+          pre_dead_ball_seconds: "",
+          post_dead_ball_seconds: "",
         });
       });
     });
 
     return rows;
+  }
+
+  function buildBipDeadBallById(snapshot) {
+    const lookup = new Map();
+
+    snapshot.tasks.forEach((task) => {
+      const orderedBips = [...task.bips].sort((left, right) => {
+        if (left.startElapsedMs !== right.startElapsedMs) {
+          return left.startElapsedMs - right.startElapsedMs;
+        }
+        return String(left.id).localeCompare(String(right.id));
+      });
+
+      orderedBips.forEach((bip, index) => {
+        const previousBipEndMs = index === 0 ? null : orderedBips[index - 1].effectiveEndElapsedMs;
+        const nextBipStartMs =
+          index === orderedBips.length - 1 ? task.effectiveEndElapsedMs : orderedBips[index + 1].startElapsedMs;
+        const preDeadBallMs = index === 0
+          ? Math.max(0, bip.startElapsedMs - task.startElapsedMs)
+          : Math.max(0, bip.startElapsedMs - (previousBipEndMs ?? bip.startElapsedMs));
+        const postDeadBallMs = Math.max(0, nextBipStartMs - bip.effectiveEndElapsedMs);
+
+        lookup.set(bip.id, {
+          pre_dead_ball_seconds: formatSeconds(preDeadBallMs),
+          post_dead_ball_seconds: formatSeconds(postDeadBallMs),
+        });
+      });
+    });
+
+    return lookup;
+  }
+
+  function countBipRucks(task, bipId) {
+    return task.rucks.filter((ruck) => ruck.bipId === bipId).length;
   }
 
   function triggerDownload(filename, contents, mimeType) {
@@ -988,6 +1069,29 @@
 
   function getRuckUnixMs(ruck) {
     return toUnixMs(ruck.createdAt);
+  }
+
+  function getRuckTimeUnixMs(ruck) {
+    return getRuckUnixMs(ruck);
+  }
+
+  function getRuckStartUnixMs(ruck) {
+    const ruckTimeUnixMs = getRuckTimeUnixMs(ruck);
+    const clampWindowMs = Math.min(RUCK_WINDOW_MS, normMs(ruck.elapsedMs));
+    return ruckTimeUnixMs === "" ? "" : Math.max(0, ruckTimeUnixMs - clampWindowMs);
+  }
+
+  function getRuckEndUnixMs(ruck) {
+    const ruckTimeUnixMs = getRuckTimeUnixMs(ruck);
+    return ruckTimeUnixMs === "" ? "" : ruckTimeUnixMs + RUCK_WINDOW_MS;
+  }
+
+  function getRuckStartSeconds(ruck) {
+    return formatSeconds(Math.max(0, normMs(ruck.elapsedMs) - RUCK_WINDOW_MS));
+  }
+
+  function getRuckEndSeconds(ruck) {
+    return formatSeconds(normMs(ruck.elapsedMs) + RUCK_WINDOW_MS);
   }
 
   function getViewSnapshot() {
@@ -1608,7 +1712,13 @@
     const centralParts = [];
     let offset = 0;
 
-    const entries = [{ name: `${folderName}/`, bytes: new Uint8Array(0), isDirectory: true }, ...files];
+    const entries = [
+      { name: `${folderName}/`, bytes: new Uint8Array(0), isDirectory: true },
+      ...files.map((file) => ({
+        ...file,
+        name: file.name.startsWith(`${folderName}/`) ? file.name : `${folderName}/${file.name}`,
+      })),
+    ];
 
     for (const entry of entries) {
       const nameBytes = zipEncoder.encode(entry.name);

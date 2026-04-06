@@ -13,10 +13,10 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260404-8" />
+    <link rel="stylesheet" href="./styles.css?v=20260406-7" />
   </head>
   <body class="editor-page">
-    <div class="app-shell app-shell--editor">
+    <div class="app-shell app-shell--editor-workspace">
       <header class="top-bar">
         <div class="top-bar__brand">
           <svg viewBox="0 0 20 20" width="16" height="16">
@@ -27,26 +27,194 @@
         </div>
         <nav class="page-tabs" aria-label="Pages">
           <a class="page-tab" href="./index.html">Logger</a>
+          <a class="page-tab" href="./review.html">Review</a>
           <a class="page-tab page-tab--active" href="./editor.html" aria-current="page">Editor</a>
         </nav>
         <div class="top-bar__context">
-          <span class="top-bar__label">Page</span>
-          <span class="top-bar__tag top-bar__tag--activity">Editor</span>
+          <span class="top-bar__label">Source</span>
+          <span id="editorTopActivity" class="top-bar__tag top-bar__tag--activity">Import export file</span>
         </div>
         <div class="top-bar__right">
-          <span class="state-pill state-pill--paused">Preview</span>
+          <span id="editorTopStatus" class="state-pill state-pill--paused">Idle</span>
         </div>
       </header>
 
-      <main class="editor-main">
-        <section class="editor-card" aria-labelledby="editorTitle">
-          <p class="editor-card__eyebrow">Editor</p>
-          <h1 id="editorTitle" class="editor-card__title">Coming Soon</h1>
-          <p class="editor-card__copy">
-            This page is reserved for the next editing workflow.
-          </p>
+      <main class="editor-workbench">
+        <section class="review-hero editor-hero">
+          <div class="review-hero__copy">
+            <p class="review-eyebrow">Import And Edit</p>
+            <h1 id="editorTitle" class="review-title">No imported session yet</h1>
+            <div class="review-meta">
+              <span id="editorMetaSource">Load a CSV, JSON, or ZIP export from the logger.</span>
+              <span id="editorMetaWindow">Task timing edits stay in the editor until you export again.</span>
+            </div>
+          </div>
+          <div class="review-hero__side">
+            <label class="editor-import" for="editorFileInput">
+              <input id="editorFileInput" type="file" accept=".csv,.json,.zip,application/json,text/csv,application/zip" />
+              <span class="editor-import__eyebrow">Accepted files</span>
+              <strong class="editor-import__title">Drop CSV, JSON, or ZIP</strong>
+              <span class="editor-import__copy">The editor reconstructs tasks, BIPs, and rucks from exported rows. No live logging controls are available here.</span>
+              <span class="editor-import__cta">Choose file</span>
+            </label>
+            <div class="review-actions">
+              <button id="editorExportCsvBtn" class="export-btn" type="button">CSV</button>
+              <button id="editorExportJsonBtn" class="export-btn" type="button">JSON</button>
+              <button id="editorExportZipBtn" class="export-btn" type="button">ZIP</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="review-kpis editor-kpis" aria-label="Imported metrics">
+          <article class="review-kpi review-kpi--work">
+            <p class="review-kpi__label">Tasks</p>
+            <strong id="editorKpiTasks" class="review-kpi__value">0</strong>
+            <span class="review-kpi__meta">Editable task intervals</span>
+          </article>
+          <article class="review-kpi review-kpi--rest">
+            <p class="review-kpi__label">BIPs</p>
+            <strong id="editorKpiBips" class="review-kpi__value">0</strong>
+            <span class="review-kpi__meta">Nested work windows</span>
+          </article>
+          <article class="review-kpi review-kpi--phase">
+            <p class="review-kpi__label">Rucks</p>
+            <strong id="editorKpiRucks" class="review-kpi__value">0</strong>
+            <span class="review-kpi__meta">Imported click events</span>
+          </article>
+          <article class="review-kpi review-kpi--clock">
+            <p class="review-kpi__label">Window</p>
+            <strong id="editorKpiWindow" class="review-kpi__value">00:00</strong>
+            <span class="review-kpi__meta">From first task start to last task end</span>
+          </article>
+          <article class="review-kpi review-kpi--gauge">
+            <p class="review-kpi__label">Rows</p>
+            <strong id="editorKpiRows" class="review-kpi__value">0</strong>
+            <span class="review-kpi__meta">Flat export rows currently loaded</span>
+          </article>
+        </section>
+
+        <section class="review-grid editor-grid">
+          <article class="review-panel editor-panel">
+            <div class="review-panel__head">
+              <div>
+                <p class="review-panel__eyebrow">Boundary Tools</p>
+                <h2 class="review-panel__title">Align Tasks To BIP Bounds</h2>
+              </div>
+            </div>
+            <p class="editor-panel__copy">
+              Use these tools when imported task windows are wider than the real ball-in-play structure. They never create tasks or BIPs; they only snap existing task boundaries.
+            </p>
+            <div class="editor-batch-actions">
+              <button id="alignStartAllBtn" class="aux-btn aux-btn--primary" type="button">All starts → first BIP</button>
+              <button id="alignEndAllBtn" class="aux-btn" type="button">All ends → last BIP</button>
+              <button id="alignBothAllBtn" class="aux-btn" type="button">All tasks → BIP bounds</button>
+            </div>
+          </article>
+
+          <article class="review-panel editor-panel">
+            <div class="review-panel__head">
+              <div>
+                <p class="review-panel__eyebrow">Selected Task</p>
+                <h2 class="review-panel__title">Edit Task Timing</h2>
+              </div>
+              <p id="editorSelectedTaskHint" class="review-panel__summary">Select a task from the timeline or the table.</p>
+            </div>
+
+            <div id="editorSelectionEmpty" class="empty-state empty-state--review">
+              <p>Import a file, then choose a task to rename it or adjust its start and end times.</p>
+            </div>
+
+            <div id="editorTaskForm" class="editor-task-form" hidden>
+              <label class="field-block field-block--selected" for="editorTaskNameInput">
+                <span class="field-block__top">
+                  <span class="field-block__label">Task name</span>
+                  <span id="editorTaskMeta" class="field-block__hint">Renaming updates task, BIP, and ruck rows on export.</span>
+                </span>
+                <input id="editorTaskNameInput" type="text" maxlength="64" autocomplete="off" placeholder="Task name" />
+              </label>
+
+              <div class="editor-timing-grid">
+                <label class="field-block field-block--selected" for="editorTaskStartInput">
+                  <span class="field-block__top">
+                    <span class="field-block__label">Task start (s)</span>
+                    <span class="field-block__hint">Cannot move later than the first BIP.</span>
+                  </span>
+                  <input id="editorTaskStartInput" type="number" min="0" step="0.01" inputmode="decimal" />
+                </label>
+
+                <label class="field-block field-block--selected" for="editorTaskEndInput">
+                  <span class="field-block__top">
+                    <span class="field-block__label">Task end (s)</span>
+                    <span class="field-block__hint">Cannot move earlier than the last BIP.</span>
+                  </span>
+                  <input id="editorTaskEndInput" type="number" min="0" step="0.01" inputmode="decimal" />
+                </label>
+              </div>
+
+              <div class="editor-selection-actions">
+                <button id="alignSelectedStartBtn" class="aux-btn aux-btn--primary" type="button">Start → first BIP</button>
+                <button id="alignSelectedEndBtn" class="aux-btn" type="button">End → last BIP</button>
+                <button id="alignSelectedBothBtn" class="aux-btn" type="button">Both</button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="review-panel editor-panel editor-panel--timeline">
+          <div class="review-panel__head">
+            <div>
+              <p class="review-panel__eyebrow">Timeline</p>
+              <h2 class="review-panel__title">Imported Session Viewer</h2>
+            </div>
+            <p id="editorTimelineSummary" class="review-panel__summary">The timeline appears after import.</p>
+          </div>
+
+          <div id="editorTimelineEmpty" class="empty-state empty-state--review">
+            <p>Import an exported logger file to inspect task windows, BIPs, and rucks in one place.</p>
+          </div>
+
+          <div id="editorTimelineWrap" class="editor-timeline-wrap" hidden>
+            <div class="timeline-workbench timeline-workbench--editor">
+              <div id="editorTimelineScale" class="timeline-scale" aria-hidden="true"></div>
+              <div id="editorTimelineMap" class="editor-track-list" role="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="review-panel review-panel--table editor-panel">
+          <div class="review-panel__head">
+            <div>
+              <p class="review-panel__eyebrow">Task List</p>
+              <h2 class="review-panel__title">Imported Tasks</h2>
+            </div>
+            <p id="editorTaskSummary" class="review-panel__summary">Import a session to populate the table.</p>
+          </div>
+
+          <div id="editorTableEmpty" class="empty-state empty-state--review">
+            <p>No imported tasks yet.</p>
+          </div>
+
+          <div id="editorTableWrap" class="review-table-wrap" hidden>
+            <table class="review-table editor-table">
+              <thead>
+                <tr>
+                  <th scope="col">Task</th>
+                  <th scope="col">Start</th>
+                  <th scope="col">End</th>
+                  <th scope="col">Duration</th>
+                  <th scope="col">BIPs</th>
+                  <th scope="col">Rucks</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody id="editorTaskTableBody"></tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>
+
+    <div id="editorSrStatus" class="sr-only" aria-live="polite"></div>
+    <script src="./editor.js?v=20260406-7"></script>
   </body>
 </html>
