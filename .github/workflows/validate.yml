@@ -1,0 +1,29 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check app.js
+        run: node --check app.js
+
+      - name: Check review.js
+        run: node --check review.js
+
+      - name: Check editor.js
+        run: node --check editor.js
