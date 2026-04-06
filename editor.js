@@ -41,6 +41,7 @@
     editorTitle: document.getElementById("editorTitle"),
     editorMetaSource: document.getElementById("editorMetaSource"),
     editorMetaWindow: document.getElementById("editorMetaWindow"),
+    editorGuide: document.getElementById("editorGuide"),
     editorFileInput: document.getElementById("editorFileInput"),
     editorExportCsvBtn: document.getElementById("editorExportCsvBtn"),
     editorExportJsonBtn: document.getElementById("editorExportJsonBtn"),
@@ -778,19 +779,19 @@
     el.editorTopStatus.classList.toggle("state-pill--paused", status === "Idle");
     el.editorTopStatus.classList.toggle("state-pill--finished", status === "Edited");
 
-    el.editorTitle.textContent = hasData ? state.activityName : "No imported session yet";
+    el.editorTitle.textContent = hasData ? state.activityName : "Bring a Session Into Focus";
+    if (el.editorGuide) {
+      el.editorGuide.hidden = hasData;
+    }
     el.editorMetaSource.textContent = hasData
       ? state.hasRunningSession && state.sourceMode === "live"
-        ? `${state.sourceName} · imports locked while Logger is running · ${state.rowCount} flat rows`
-        : `${state.sourceName} · ${state.sourceType} · ${state.rowCount} flat rows`
+        ? `${state.sourceName} · live from Logger · ${state.rowCount} flat rows`
+        : `${state.sourceName} · ${state.sourceType} · ${state.rowCount} flat rows · imported ${formatReviewDate(state.importedAtIso)}`
       : state.hasRunningSession
-        ? "A live activity is running in Logger and is shown here automatically."
-        : "Load a CSV, JSON, or ZIP export from the logger.";
-    el.editorMetaWindow.textContent = hasData
-      ? state.sourceMode === "live"
-        ? `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks · synced from Logger`
-        : `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks · imported ${formatReviewDate(state.importedAtIso)}`
-      : "Task timing edits stay in the editor until you export again.";
+        ? "A live activity is running in Logger and appears here automatically."
+        : "Load a CSV, JSON, or ZIP from Logger to start reviewing and correcting task bounds.";
+    el.editorMetaWindow.hidden = true;
+    el.editorMetaWindow.textContent = "";
   }
 
   function renderKpis() {
@@ -809,7 +810,7 @@
     el.editorTaskForm.hidden = !hasTask;
     el.editorSelectedTaskHint.textContent = hasTask
       ? `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))}`
-      : "Select a task from the timeline or the table.";
+      : "Select a task to unlock its name and bounds.";
 
     if (!hasTask) {
       return;
@@ -818,8 +819,8 @@
     const firstBip = task.bips[0];
     const lastBip = task.bips[task.bips.length - 1];
     el.editorTaskMeta.textContent = task.bips.length
-      ? `First BIP ${formatSeconds(task.bips[0].startMs)}s · Last BIP ${formatSeconds(lastBip.endMs)}s`
-      : "This task has no BIPs, so timing is fully manual.";
+      ? `First ${formatSeconds(firstBip.startMs)}s · Last ${formatSeconds(lastBip.endMs)}s`
+      : "No BIPs in this task.";
 
     syncInputValue(el.editorTaskNameInput, task.name);
     syncInputValue(el.editorTaskStartInput, formatSeconds(task.startMs));
@@ -832,7 +833,7 @@
       el.editorTimelineWrap.hidden = true;
       el.editorTimelineScale.innerHTML = "";
       el.editorTimelineMap.innerHTML = "";
-      el.editorTimelineSummary.textContent = "The timeline appears after import.";
+      el.editorTimelineSummary.textContent = "The timeline appears as soon as a session is loaded.";
       return;
     }
 
@@ -847,7 +848,7 @@
     el.editorTimelineWrap.hidden = false;
     el.editorTimelineScale.innerHTML = buildScale(totalMs);
     el.editorTimelineMap.innerHTML = state.tasks.map((task) => renderTimelineRow(task, totalMs)).join("");
-    el.editorTimelineSummary.textContent = `${state.tasks.length} tasks across ${formatCompactDuration(totalWindowMs())}. Click a task row to edit its bounds.`;
+    el.editorTimelineSummary.textContent = `${state.tasks.length} tasks · ${formatCompactDuration(totalWindowMs())} window · tap a row to edit.`;
   }
 
   function renderTimelineRow(task, totalMs) {
@@ -893,14 +894,14 @@
     if (!state.tasks.length) {
       el.editorTableEmpty.hidden = false;
       el.editorTableWrap.hidden = true;
-      el.editorTaskSummary.textContent = "Import a session to populate the table.";
+      el.editorTaskSummary.textContent = "Load a session to populate the task table.";
       el.editorTaskTableBody.innerHTML = "";
       return;
     }
 
     el.editorTableEmpty.hidden = true;
     el.editorTableWrap.hidden = false;
-    el.editorTaskSummary.textContent = `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks. Editing updates the next export only.`;
+    el.editorTaskSummary.textContent = `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks.`;
     el.editorTaskTableBody.innerHTML = state.tasks
       .map((task) => {
         const isSelected = task.id === state.selectedTaskId;
@@ -1136,15 +1137,18 @@
     const cta = el.importSurface.querySelector(".editor-import__cta");
 
     if (title) {
-      title.textContent = locked ? "Live activity connected" : "Drop CSV, JSON, or ZIP";
+      title.textContent = locked ? "Live activity connected" : "Load another export";
     }
     if (copy) {
       copy.textContent = locked
-        ? "Editor is showing the current running activity from Logger. Stop or finish it there before loading another file."
-        : "The editor reconstructs tasks, BIPs, and rucks from exported rows. No live logging controls are available here.";
+        ? "Stop it in Logger before loading a different export."
+        : "CSV, JSON, or ZIP from Logger.";
     }
     if (cta) {
-      cta.textContent = locked ? "Live source" : "Choose file";
+      const label = cta.querySelector(".editor-import__cta-label");
+      if (label) {
+        label.textContent = locked ? "Live source" : "Choose file";
+      }
     }
   }
 
@@ -1413,20 +1417,25 @@
         return;
       }
 
+      const publishedAt = new Date().toISOString();
+      const publishedSession = buildReviewSourceSession(publishedAt);
+
       localStorage.setItem(
         REVIEW_SOURCE_KEY,
         JSON.stringify({
           source: "editor",
-          updatedAt: new Date().toISOString(),
+          updatedAt: publishedAt,
           sourceName: state.sourceName,
           sourceType: state.sourceType,
           importedAtIso: state.importedAtIso,
           exportedAtIso: state.exportedAtIso,
           selectedTaskId: state.selectedTaskId,
           dirty: state.dirty,
-          session: buildReviewSourceSession(),
+          session: publishedSession,
         })
       );
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(publishedSession));
     } catch (error) {
       console.error("Unable to sync review source from Editor", error);
     }
@@ -1436,7 +1445,7 @@
     return state.tasks.length > 0 && (state.sourceMode === "file" || state.dirty);
   }
 
-  function buildReviewSourceSession() {
+  function buildReviewSourceSession(publishedAt = new Date().toISOString()) {
     const tasks = state.tasks.map((task) => ({
       id: task.id,
       name: task.name,
@@ -1476,8 +1485,8 @@
       lastStartedAt: null,
       activeTaskId: null,
       activeBipId: null,
-      isFinished: false,
-      finishedAt: null,
+      isFinished: true,
+      finishedAt: publishedAt,
       tasks,
       events: [],
     };

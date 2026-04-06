@@ -13,7 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260406-20" />
+    <link rel="stylesheet" href="./styles.css?v=20260407-4" />
   </head>
   <body class="editor-page">
     <div class="app-shell app-shell--editor-workspace">
@@ -42,95 +42,113 @@
       <main class="editor-workbench">
         <section class="editor-overview">
           <section class="review-hero editor-hero">
-            <div class="review-hero__copy">
-              <p class="review-eyebrow">Import And Edit</p>
-              <h1 id="editorTitle" class="review-title">No imported session yet</h1>
-              <div class="review-meta">
-                <span id="editorMetaSource">Load a CSV, JSON, or ZIP export from the logger.</span>
-                <span id="editorMetaWindow">Task timing edits stay in the editor until you export again.</span>
+            <div class="editor-hero__primary">
+              <div class="review-hero__copy">
+                <p class="review-eyebrow">Editor Workspace</p>
+                <h1 id="editorTitle" class="review-title">Bring a Session Into Focus</h1>
+                <div class="review-meta">
+                  <span id="editorMetaSource">Load a CSV, JSON, or ZIP from Logger to start reviewing and correcting task bounds.</span>
+                  <span id="editorMetaWindow" hidden>Rename tasks, snap them to BIP edges, and export a clean corrected session when you are done.</span>
+                </div>
               </div>
-            </div>
-            <div class="review-hero__side">
               <label class="editor-import" for="editorFileInput">
                 <input id="editorFileInput" type="file" accept=".csv,.json,.zip,application/json,text/csv,application/zip" />
-                <span class="editor-import__eyebrow">Accepted files</span>
-                <strong class="editor-import__title">Drop CSV, JSON, or ZIP</strong>
-                <span class="editor-import__copy">The editor reconstructs tasks, BIPs, and rucks from exported rows. No live logging controls are available here.</span>
-                <span class="editor-import__cta">Choose file</span>
+                <span class="editor-import__eyebrow">Import file</span>
+                <strong class="editor-import__title">Load another export</strong>
+                <span class="editor-import__copy">CSV, JSON, or ZIP from Logger.</span>
+                <span class="editor-import__cta">
+                  <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                    <path d="M10 3v8m0 0l-3-3m3 3l3-3M4 13.5v1.5A1.5 1.5 0 0 0 5.5 16.5h9A1.5 1.5 0 0 0 16 15v-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span class="editor-import__cta-label">Choose file</span>
+                </span>
               </label>
-              <div class="review-actions">
-                <button id="editorExportCsvBtn" class="export-btn" type="button">CSV</button>
-                <button id="editorExportJsonBtn" class="export-btn" type="button">JSON</button>
-                <button id="editorExportZipBtn" class="export-btn" type="button">ZIP</button>
+              <div id="editorGuide" class="editor-guide" aria-label="Editor workflow">
+                <article class="editor-guide__step">
+                  <span class="editor-guide__index">1</span>
+                  <div class="editor-guide__copy">
+                    <strong>Import</strong>
+                    <span>Load a session or let Logger mirror the live one here.</span>
+                  </div>
+                </article>
+                <article class="editor-guide__step">
+                  <span class="editor-guide__index">2</span>
+                  <div class="editor-guide__copy">
+                    <strong>Select</strong>
+                    <span>Pick one task from the timeline or table to unlock edits.</span>
+                  </div>
+                </article>
+                <article class="editor-guide__step">
+                  <span class="editor-guide__index">3</span>
+                  <div class="editor-guide__copy">
+                    <strong>Correct</strong>
+                    <span>Snap to BIP bounds, rename the task, then export the revised session.</span>
+                  </div>
+                </article>
               </div>
             </div>
-          </section>
-
-          <section class="review-kpis editor-kpis" aria-label="Imported metrics">
-            <article class="review-kpi review-kpi--work">
-              <p class="review-kpi__label">Tasks</p>
-              <strong id="editorKpiTasks" class="review-kpi__value">0</strong>
-              <span class="review-kpi__meta">Editable task intervals</span>
-            </article>
-            <article class="review-kpi review-kpi--rest">
-              <p class="review-kpi__label">BIPs</p>
-              <strong id="editorKpiBips" class="review-kpi__value">0</strong>
-              <span class="review-kpi__meta">Nested work windows</span>
-            </article>
-            <article class="review-kpi review-kpi--phase">
-              <p class="review-kpi__label">Rucks</p>
-              <strong id="editorKpiRucks" class="review-kpi__value">0</strong>
-              <span class="review-kpi__meta">Imported click events</span>
-            </article>
-            <article class="review-kpi review-kpi--clock">
-              <p class="review-kpi__label">Window</p>
-              <strong id="editorKpiWindow" class="review-kpi__value">00:00</strong>
-              <span class="review-kpi__meta">From first task start to last task end</span>
-            </article>
-            <article class="review-kpi review-kpi--gauge">
-              <p class="review-kpi__label">Rows</p>
-              <strong id="editorKpiRows" class="review-kpi__value">0</strong>
-              <span class="review-kpi__meta">Flat export rows currently loaded</span>
-            </article>
+            <section class="editor-metrics-strip" aria-label="Imported metrics">
+              <article class="editor-metric">
+                <p class="editor-metric__label">Tasks</p>
+                <strong id="editorKpiTasks" class="editor-metric__value">0</strong>
+                <span class="editor-metric__meta">Intervals</span>
+              </article>
+              <article class="editor-metric">
+                <p class="editor-metric__label">BIPs</p>
+                <strong id="editorKpiBips" class="editor-metric__value">0</strong>
+                <span class="editor-metric__meta">Work windows</span>
+              </article>
+              <article class="editor-metric">
+                <p class="editor-metric__label">Rucks</p>
+                <strong id="editorKpiRucks" class="editor-metric__value">0</strong>
+                <span class="editor-metric__meta">Clicks</span>
+              </article>
+              <article class="editor-metric">
+                <p class="editor-metric__label">Window</p>
+                <strong id="editorKpiWindow" class="editor-metric__value">00:00</strong>
+                <span class="editor-metric__meta">Task span</span>
+              </article>
+              <article class="editor-metric">
+                <p class="editor-metric__label">Rows</p>
+                <strong id="editorKpiRows" class="editor-metric__value">0</strong>
+                <span class="editor-metric__meta">Flat rows</span>
+              </article>
+            </section>
+            <div class="editor-export-group editor-export-group--stack">
+              <p class="editor-export-group__label">Next export</p>
+              <div class="review-actions review-actions--stack">
+                <button id="editorExportCsvBtn" class="export-btn export-btn--csv" type="button">CSV</button>
+                <button id="editorExportJsonBtn" class="export-btn export-btn--json" type="button">JSON</button>
+                <button id="editorExportZipBtn" class="export-btn export-btn--zip" type="button">ZIP</button>
+              </div>
+            </div>
           </section>
         </section>
 
         <section class="editor-layout">
-          <section class="review-grid editor-grid editor-layout__tools">
-            <article class="review-panel editor-panel editor-panel--batch">
-              <div class="review-panel__head">
-                <div>
-                  <p class="review-panel__eyebrow">Boundary Tools</p>
-                  <h2 class="review-panel__title">Align Tasks To BIP Bounds</h2>
-                </div>
+          <section class="review-panel editor-panel editor-panel--workspace editor-layout__tools">
+            <div class="review-panel__head">
+              <div>
+                <p class="review-panel__eyebrow">Boundary Tools</p>
               </div>
-              <div class="editor-batch-layout">
-                <p class="editor-panel__copy">
-                  Trim imported task windows to the first and last BIP. These tools only snap existing boundaries and never create new events.
-                </p>
+              <p id="editorSelectedTaskHint" class="review-panel__summary">Select a task from the timeline or the table.</p>
+            </div>
+
+            <div class="editor-workspace-grid">
+              <div class="editor-workspace-tools">
                 <div class="editor-batch-actions">
                   <button id="alignStartAllBtn" class="aux-btn aux-btn--primary" type="button">All starts → first BIP</button>
                   <button id="alignEndAllBtn" class="aux-btn" type="button">All ends → last BIP</button>
                   <button id="alignBothAllBtn" class="aux-btn" type="button">All tasks → BIP bounds</button>
                 </div>
               </div>
-            </article>
 
-            <article class="review-panel editor-panel editor-panel--selection">
-              <div class="review-panel__head">
-                <div>
-                  <p class="review-panel__eyebrow">Selected Task</p>
-                  <h2 class="review-panel__title">Edit Task Timing</h2>
-                </div>
-                <p id="editorSelectedTaskHint" class="review-panel__summary">Select a task from the timeline or the table.</p>
-              </div>
-
-              <div id="editorSelectionEmpty" class="empty-state empty-state--review">
-                <p>Import a file, then choose a task to rename it or adjust its start and end times.</p>
+              <div id="editorSelectionEmpty" class="empty-state empty-state--review editor-workspace-empty">
+                <p>Select one task to unlock its name, start, end, and local snap actions.</p>
               </div>
 
               <div id="editorTaskForm" class="editor-task-form" hidden>
-                <label class="field-block field-block--selected" for="editorTaskNameInput">
+                <label class="field-block field-block--selected editor-task-form__name" for="editorTaskNameInput">
                   <span class="field-block__top">
                     <span class="field-block__label">Task</span>
                     <span id="editorTaskMeta" class="field-block__hint">Export keeps this task name across related rows.</span>
@@ -138,31 +156,33 @@
                   <input id="editorTaskNameInput" type="text" maxlength="64" autocomplete="off" placeholder="Task name" />
                 </label>
 
-                <div class="editor-timing-grid">
-                  <label class="field-block field-block--selected" for="editorTaskStartInput">
-                    <span class="field-block__top">
-                      <span class="field-block__label">Start (s)</span>
-                      <span class="field-block__hint">Must stay at or before the first BIP.</span>
-                    </span>
-                    <input id="editorTaskStartInput" type="number" min="0" step="0.01" inputmode="decimal" />
-                  </label>
+                <div class="editor-task-form__timing">
+                  <div class="editor-timing-grid">
+                    <label class="field-block field-block--selected" for="editorTaskStartInput">
+                      <span class="field-block__top">
+                        <span class="field-block__label">Start (s)</span>
+                        <span class="field-block__hint">≤ first BIP</span>
+                      </span>
+                      <input id="editorTaskStartInput" type="number" min="0" step="0.01" inputmode="decimal" />
+                    </label>
 
-                  <label class="field-block field-block--selected" for="editorTaskEndInput">
-                    <span class="field-block__top">
-                      <span class="field-block__label">End (s)</span>
-                      <span class="field-block__hint">Must stay at or after the last BIP.</span>
-                    </span>
-                    <input id="editorTaskEndInput" type="number" min="0" step="0.01" inputmode="decimal" />
-                  </label>
-                </div>
+                    <label class="field-block field-block--selected" for="editorTaskEndInput">
+                      <span class="field-block__top">
+                        <span class="field-block__label">End (s)</span>
+                        <span class="field-block__hint">≥ last BIP</span>
+                      </span>
+                      <input id="editorTaskEndInput" type="number" min="0" step="0.01" inputmode="decimal" />
+                    </label>
+                  </div>
 
-                <div class="editor-selection-actions">
-                  <button id="alignSelectedStartBtn" class="aux-btn aux-btn--primary" type="button">Start → first BIP</button>
-                  <button id="alignSelectedEndBtn" class="aux-btn" type="button">End → last BIP</button>
-                  <button id="alignSelectedBothBtn" class="aux-btn" type="button">Both</button>
+                  <div class="editor-selection-actions">
+                    <button id="alignSelectedStartBtn" class="aux-btn aux-btn--primary" type="button">Start → first BIP</button>
+                    <button id="alignSelectedEndBtn" class="aux-btn" type="button">End → last BIP</button>
+                    <button id="alignSelectedBothBtn" class="aux-btn" type="button">Both → BIP bounds</button>
+                  </div>
                 </div>
               </div>
-            </article>
+            </div>
           </section>
 
           <section class="review-panel editor-panel editor-panel--timeline editor-layout__timeline">
@@ -221,6 +241,6 @@
     </div>
 
     <div id="editorSrStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./editor.js?v=20260406-9"></script>
+    <script src="./editor.js?v=20260407-1"></script>
   </body>
 </html>
