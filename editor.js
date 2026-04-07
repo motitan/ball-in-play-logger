@@ -125,9 +125,10 @@
     }
 
     window.addEventListener("storage", (event) => {
-      if (!event.key || event.key === STORAGE_KEY) {
-        refreshRunningSession(true);
+      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
+        return;
       }
+      refreshRunningSession(true);
     });
 
     window.addEventListener("focus", () => refreshRunningSession(false));
@@ -414,43 +415,58 @@
       hasRunningSession: false,
       runningActivityId: null,
       runningActivityName: "",
+      liveClockState: "paused",
     };
   }
 
   function refreshRunningSession(announceOnSwitch) {
     const liveSession = loadLiveSession();
-    const isRunning = isRunningLiveSession(liveSession);
+    const hasActiveSession = hasActiveLiveSession(liveSession);
 
-    if (!isRunning) {
+    if (!hasActiveSession) {
+      const persistedSource = loadPersistedEditorSource(state.selectedTaskId);
+
       if (state.sourceMode === "live") {
-        state = loadPersistedEditorSource(state.selectedTaskId) || createEditorState();
+        state = persistedSource || createEditorState();
+      } else if (!persistedSource && state.sourceMode !== "none") {
+        state = createEditorState();
+        if (announceOnSwitch) {
+          announce("Editor cleared because Logger took over with a new activity.");
+        }
+      } else if (persistedSource && state.sourceMode === "none") {
+        state = persistedSource;
       } else {
         state.hasRunningSession = false;
         state.runningActivityId = null;
         state.runningActivityName = "";
+        state.liveClockState = "paused";
       }
       renderAll();
       syncLiveTimer();
       return;
     }
 
+    const previousState = state;
     const nextActivityId = liveSession.sessionId;
-    const isDifferentLiveActivity = state.runningActivityId && state.runningActivityId !== nextActivityId;
-    const shouldHydrate =
-      state.sourceMode !== "live" ||
-      isDifferentLiveActivity ||
-      !state.dirty;
+    const isDifferentLiveActivity = previousState.runningActivityId && previousState.runningActivityId !== nextActivityId;
+    const previousSourceMode = previousState.sourceMode;
 
-    if (shouldHydrate) {
-      const previousSourceMode = state.sourceMode;
-      state = buildEditorStateFromLiveSession(liveSession, state.selectedTaskId);
-      if (announceOnSwitch || previousSourceMode !== "live") {
-        announce(`Showing current running activity: ${state.activityName}.`);
-      }
-    } else {
-      state.hasRunningSession = true;
-      state.runningActivityId = nextActivityId;
-      state.runningActivityName = activityLabel(liveSession.activityName);
+    state = buildEditorStateFromLiveSession(liveSession, previousState.selectedTaskId);
+
+    if (
+      previousState.sourceMode === "live" &&
+      previousState.dirty &&
+      previousState.activityId === nextActivityId
+    ) {
+      state = reapplyLiveAlignmentState(state, previousState);
+    }
+
+    if (announceOnSwitch || previousSourceMode !== "live" || isDifferentLiveActivity) {
+      announce(
+        liveSession.clockState === "running"
+          ? `Showing current running activity: ${state.activityName}.`
+          : `Showing current paused activity: ${state.activityName}.`
+      );
     }
 
     renderAll();
@@ -525,6 +541,7 @@
       hasRunningSession: true,
       runningActivityId: session.sessionId,
       runningActivityName: activityLabel(session.activityName),
+      liveClockState: session.clockState,
     };
   }
 
@@ -582,11 +599,14 @@
           ? payload.selectedTaskId
           : tasks[0]?.id || null;
 
+    const nextSourceType = toText(payload.sourceType) || "EDITOR";
+    const nextSourceMode = nextSourceType === "LIVE" ? "live" : "file";
+
     return {
       activityId: session.sessionId,
       activityName: activityLabel(session.activityName),
       sourceName: toText(payload.sourceName) || "Restored activity from Editor",
-      sourceType: toText(payload.sourceType) || "EDITOR",
+      sourceType: nextSourceType,
       importedAtIso: toText(payload.importedAtIso) || nowIso,
       exportedAtIso: toText(payload.exportedAtIso) || nowIso,
       rowCount: countDerivedRows(tasks),
@@ -594,10 +614,11 @@
       selectedTaskId: nextSelectedTaskId,
       originUnixMs,
       dirty: payload.dirty === true,
-      sourceMode: "file",
+      sourceMode: nextSourceMode,
       hasRunningSession: false,
       runningActivityId: null,
       runningActivityName: "",
+      liveClockState: "paused",
     };
   }
 
@@ -685,6 +706,12 @@
   }
 
   function handleTaskNameInput(event) {
+    if (isLiveEditorLocked()) {
+      renderSelectedTaskPanel();
+      announce("Live activity only allows BIP alignment in Editor. Stop it in Logger before manual edits.");
+      return;
+    }
+
     const task = selectedTask();
     if (!task) {
       return;
@@ -695,6 +722,12 @@
   }
 
   function handleTaskBoundaryInput(boundary) {
+    if (isLiveEditorLocked()) {
+      renderSelectedTaskPanel();
+      announce("Live activity only allows BIP alignment in Editor. Stop it in Logger before manual edits.");
+      return;
+    }
+
     const task = selectedTask();
     if (!task) {
       return;
@@ -722,6 +755,7 @@
   function applyAlignment(mode, scope) {
     const tasks = scope === "selected" ? [selectedTask()].filter(Boolean) : state.tasks;
     let changedCount = 0;
+    const wasLive = isLiveEditorLocked();
 
     tasks.forEach((task) => {
       if (!task || !task.bips.length) {
@@ -748,7 +782,11 @@
     sortTasks();
     state.dirty = true;
     renderAll();
-    announce(`${changedCount} task${changedCount === 1 ? "" : "s"} aligned to BIP bounds.`);
+    announce(
+      wasLive
+        ? `${changedCount} task${changedCount === 1 ? "" : "s"} aligned to BIP bounds. Live sync stays active while Logger updates.`
+        : `${changedCount} task${changedCount === 1 ? "" : "s"} aligned to BIP bounds.`
+    );
   }
 
   function renderAll() {
@@ -758,16 +796,20 @@
     renderTimeline();
     renderTaskTable();
     syncExportButtons();
+    syncEditingState();
     syncImportState();
     syncReviewSourceStorage();
   }
 
   function renderHeader() {
     const hasData = state.tasks.length > 0;
+    const hasLiveSource = state.hasRunningSession && state.sourceMode === "live";
     const status = !hasData
       ? "Idle"
-      : state.hasRunningSession && state.sourceMode === "live" && !state.dirty
-        ? "Running"
+      : hasLiveSource
+        ? state.liveClockState === "running"
+          ? "Running"
+          : "Paused"
         : state.dirty
           ? "Edited"
           : "Loaded";
@@ -775,8 +817,8 @@
     document.title = hasData ? `${state.activityName} — BIP Editor` : "BIP Editor";
     el.editorTopActivity.textContent = hasData ? state.activityName : "Import export file";
     el.editorTopStatus.textContent = status;
-    el.editorTopStatus.classList.toggle("state-pill--running", status === "Running" || (status === "Loaded" && state.sourceMode === "live"));
-    el.editorTopStatus.classList.toggle("state-pill--paused", status === "Idle");
+    el.editorTopStatus.classList.toggle("state-pill--running", status === "Running");
+    el.editorTopStatus.classList.toggle("state-pill--paused", status === "Idle" || status === "Paused");
     el.editorTopStatus.classList.toggle("state-pill--finished", status === "Edited");
 
     el.editorTitle.textContent = hasData ? state.activityName : "Bring a Session Into Focus";
@@ -784,11 +826,17 @@
       el.editorGuide.hidden = hasData;
     }
     el.editorMetaSource.textContent = hasData
-      ? state.hasRunningSession && state.sourceMode === "live"
-        ? `${state.sourceName} · live from Logger · ${state.rowCount} flat rows`
+      ? hasLiveSource
+        ? state.dirty
+          ? `${state.sourceName} · live from Logger · local alignments stay synced · ${state.rowCount} flat rows`
+          : state.liveClockState === "running"
+            ? `${state.sourceName} · live from Logger · align to BIP bounds while running · ${state.rowCount} flat rows`
+            : `${state.sourceName} · paused in Logger · data stays here until the activity is finished or deleted · ${state.rowCount} flat rows`
         : `${state.sourceName} · ${state.sourceType} · ${state.rowCount} flat rows · imported ${formatReviewDate(state.importedAtIso)}`
       : state.hasRunningSession
-        ? "A live activity is running in Logger and appears here automatically."
+        ? state.liveClockState === "running"
+          ? "A live activity is running in Logger and appears here automatically."
+          : "A paused activity remains visible here until it is finished or deleted in Logger."
         : "Load a CSV, JSON, or ZIP from Logger to start reviewing and correcting task bounds.";
     el.editorMetaWindow.hidden = true;
     el.editorMetaWindow.textContent = "";
@@ -805,11 +853,16 @@
   function renderSelectedTaskPanel() {
     const task = selectedTask();
     const hasTask = Boolean(task);
+    const liveLocked = isLiveEditorLocked();
 
     el.editorSelectionEmpty.hidden = hasTask;
     el.editorTaskForm.hidden = !hasTask;
     el.editorSelectedTaskHint.textContent = hasTask
-      ? `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))}`
+      ? liveLocked
+        ? state.liveClockState === "running"
+          ? `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))} · align only while live`
+          : `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))} · paused in Logger`
+        : `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))}`
       : "Select a task to unlock its name and bounds.";
 
     if (!hasTask) {
@@ -818,9 +871,13 @@
 
     const firstBip = task.bips[0];
     const lastBip = task.bips[task.bips.length - 1];
-    el.editorTaskMeta.textContent = task.bips.length
-      ? `First ${formatSeconds(firstBip.startMs)}s · Last ${formatSeconds(lastBip.endMs)}s`
-      : "No BIPs in this task.";
+    el.editorTaskMeta.textContent = liveLocked
+      ? task.bips.length
+        ? `Live task preview · first ${formatSeconds(firstBip.startMs)}s · last ${formatSeconds(lastBip.endMs)}s`
+        : "Live task preview · no BIPs in this task."
+      : task.bips.length
+        ? `First ${formatSeconds(firstBip.startMs)}s · Last ${formatSeconds(lastBip.endMs)}s`
+        : "No BIPs in this task.";
 
     syncInputValue(el.editorTaskNameInput, task.name);
     syncInputValue(el.editorTaskStartInput, formatSeconds(task.startMs));
@@ -902,9 +959,11 @@
     el.editorTableEmpty.hidden = true;
     el.editorTableWrap.hidden = false;
     el.editorTaskSummary.textContent = `${state.tasks.length} tasks · ${totalBips()} BIPs · ${totalRucks()} rucks.`;
+    const liveLocked = isLiveEditorLocked();
     el.editorTaskTableBody.innerHTML = state.tasks
       .map((task) => {
         const isSelected = task.id === state.selectedTaskId;
+        const actionLabel = liveLocked ? (isSelected ? "Viewing" : "View") : isSelected ? "Editing" : "Edit";
         return `
           <tr class="${isSelected ? "editor-table__row--selected" : ""}">
             <td>
@@ -921,7 +980,7 @@
             <td class="review-table__metric review-table__metric--accent">${esc(formatSeconds(taskDurationMs(task)))}s</td>
             <td>${task.bips.length}</td>
             <td>${task.rucks.length}</td>
-            <td><button class="aux-btn aux-btn--table" type="button" data-task-id="${esc(task.id)}">${isSelected ? "Editing" : "Edit"}</button></td>
+            <td><button class="aux-btn aux-btn--table" type="button" data-task-id="${esc(task.id)}">${actionLabel}</button></td>
           </tr>
         `;
       })
@@ -1115,6 +1174,26 @@
     el.alignStartAllBtn.disabled = disabled;
     el.alignEndAllBtn.disabled = disabled;
     el.alignBothAllBtn.disabled = disabled;
+  }
+
+  function syncEditingState() {
+    const hasSelectedTask = Boolean(selectedTask());
+    const liveLocked = isLiveEditorLocked();
+    const selectedTaskDisabled = !hasSelectedTask;
+    const allTaskDisabled = !state.tasks.length;
+
+    el.editorTaskNameInput.disabled = selectedTaskDisabled;
+    el.editorTaskStartInput.disabled = selectedTaskDisabled;
+    el.editorTaskEndInput.disabled = selectedTaskDisabled;
+    el.editorTaskNameInput.readOnly = hasSelectedTask && liveLocked;
+    el.editorTaskStartInput.readOnly = hasSelectedTask && liveLocked;
+    el.editorTaskEndInput.readOnly = hasSelectedTask && liveLocked;
+    el.alignSelectedStartBtn.disabled = selectedTaskDisabled;
+    el.alignSelectedEndBtn.disabled = selectedTaskDisabled;
+    el.alignSelectedBothBtn.disabled = selectedTaskDisabled;
+    el.alignStartAllBtn.disabled = allTaskDisabled;
+    el.alignEndAllBtn.disabled = allTaskDisabled;
+    el.alignBothAllBtn.disabled = allTaskDisabled;
   }
 
   function syncImportState() {
@@ -1381,6 +1460,7 @@
       hasRunningSession: false,
       runningActivityId: null,
       runningActivityName: "",
+      liveClockState: "paused",
     };
   }
 
@@ -1411,9 +1491,7 @@
   function syncReviewSourceStorage() {
     try {
       if (!shouldPublishReviewSource()) {
-        if (state.sourceMode === "live") {
-          localStorage.removeItem(REVIEW_SOURCE_KEY);
-        }
+        localStorage.removeItem(REVIEW_SOURCE_KEY);
         return;
       }
 
@@ -1434,8 +1512,6 @@
           session: publishedSession,
         })
       );
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(publishedSession));
     } catch (error) {
       console.error("Unable to sync review source from Editor", error);
     }
@@ -1443,6 +1519,50 @@
 
   function shouldPublishReviewSource() {
     return state.tasks.length > 0 && (state.sourceMode === "file" || state.dirty);
+  }
+
+  function reapplyLiveAlignmentState(nextState, previousState) {
+    const previousTasks = new Map(previousState.tasks.map((task) => [task.id, task]));
+    let changed = false;
+
+    const nextTasks = nextState.tasks.map((task) => {
+      const previousTask = previousTasks.get(task.id);
+      const alignedTask = applyLiveAlignmentToEditorTask(task, previousTask, nextState.originUnixMs);
+      if (alignedTask !== task) {
+        changed = true;
+      }
+      return alignedTask;
+    });
+
+    return changed
+      ? {
+          ...nextState,
+          tasks: nextTasks,
+          dirty: true,
+        }
+      : nextState;
+  }
+
+  function applyLiveAlignmentToEditorTask(task, previousTask, originUnixMs) {
+    if (!previousTask || !task.bips.length) {
+      return task;
+    }
+
+    const alignStart = isTaskStartAlignedToFirstBip(previousTask);
+    const alignEnd = isTaskEndAlignedToLastBip(previousTask);
+    if (!alignStart && !alignEnd) {
+      return task;
+    }
+
+    const nextTask = { ...task };
+    if (alignStart) {
+      nextTask.startMs = task.bips[0].startMs;
+    }
+    if (alignEnd) {
+      nextTask.endMs = task.bips[task.bips.length - 1].endMs;
+    }
+    syncTaskUnixBounds(nextTask, originUnixMs);
+    return nextTask;
   }
 
   function buildReviewSourceSession(publishedAt = new Date().toISOString()) {
@@ -1612,8 +1732,34 @@
     };
   }
 
-  function isRunningLiveSession(session) {
-    return session.clockState === "running" && !session.isFinished && hasValue(session.activityName);
+  function hasActiveLiveSession(session) {
+    return (
+      session &&
+      session.isFinished !== true &&
+      (
+        session.clockState === "running" ||
+        hasValue(session.activityName) ||
+        session.tasks.length > 0 ||
+        session.events.length > 0 ||
+        normMs(session.elapsedMs) > 0
+      )
+    );
+  }
+
+  function isLiveEditorLocked() {
+    return state.hasRunningSession && state.sourceMode === "live";
+  }
+
+  function isTaskStartAlignedToFirstBip(task) {
+    return Boolean(task?.bips?.length) && normMs(task.startMs) === normMs(task.bips[0].startMs);
+  }
+
+  function isTaskEndAlignedToLastBip(task) {
+    if (!task?.bips?.length) {
+      return false;
+    }
+    const lastBip = task.bips[task.bips.length - 1];
+    return normMs(task.endMs) === normMs(lastBip.endMs);
   }
 
   function getCurrentElapsedMs(session, now = new Date()) {
@@ -1842,7 +1988,10 @@
   }
 
   function syncLiveTimer() {
-    const shouldRun = state.hasRunningSession && state.sourceMode === "live" && !state.dirty;
+    const shouldRun =
+      state.hasRunningSession &&
+      state.sourceMode === "live" &&
+      state.liveClockState === "running";
     if (shouldRun && !liveSyncTimer) {
       liveSyncTimer = window.setInterval(() => {
         refreshRunningSession(false);

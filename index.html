@@ -13,10 +13,10 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260406-7" />
+    <link rel="stylesheet" href="./styles.css?v=20260407-27" />
   </head>
-  <body>
-    <div class="app-shell">
+  <body class="logger-page">
+    <div class="app-shell app-shell--logger">
       <header class="top-bar">
         <div class="top-bar__brand">
           <svg viewBox="0 0 20 20" width="16" height="16">
@@ -33,9 +33,6 @@
         <div class="top-bar__context">
           <span class="top-bar__label">Activity</span>
           <span id="activityBadge" class="top-bar__tag top-bar__tag--activity">Start activity</span>
-          <span class="top-bar__sep">·</span>
-          <span class="top-bar__label">Period</span>
-          <span id="periodBadge" class="top-bar__tag top-bar__tag--period">Name period</span>
         </div>
         <div class="top-bar__right">
           <span id="savePill" class="save-dot" title="Auto-save ready"></span>
@@ -107,30 +104,6 @@
         </section>
 
         <section class="col-inputs" aria-label="Editors">
-          <label class="field-block field-block--period" for="periodInput">
-            <span class="field-block__top">
-              <span class="field-block__label">Period</span>
-              <span class="field-block__hint">Name the live period whenever it changes.</span>
-            </span>
-            <input
-              id="periodInput"
-              name="period"
-              type="text"
-              maxlength="48"
-              autocomplete="off"
-              placeholder="e.g. First Half"
-            />
-          </label>
-
-          <section class="field-block field-block--task-flow" aria-label="Task workflow">
-            <span class="field-block__top">
-              <span class="field-block__label">Task workflow</span>
-              <span class="field-block__hint">
-                Press T+ to create Task 1, Task 2, and so on. Rename it after creation from the selected task editor.
-              </span>
-            </span>
-          </section>
-
           <section id="selectedTaskPanel" class="selected-task-panel" aria-label="Selected task" hidden>
             <div class="selected-task-panel__top">
               <div class="selected-task-panel__head">
@@ -155,12 +128,39 @@
               />
             </label>
 
-            <div class="selected-task-panel__actions">
-              <button id="selectedTaskActionBtn" class="aux-btn aux-btn--primary" type="button">
-                Start selected
+            <div class="selected-task-panel__times" aria-label="Selected task times">
+              <button
+                id="selectedTaskStartBtn"
+                class="selected-task-time"
+                type="button"
+                aria-label="Edit selected task start time"
+                title="Edit start time"
+              >
+                <span class="selected-task-time__label">Start</span>
+                <strong id="selectedTaskStartTime" class="selected-task-time__value">00:00:00</strong>
               </button>
-              <button id="clearTaskSelectionBtn" class="aux-btn" type="button">Clear</button>
+              <button
+                id="selectedTaskEndBtn"
+                class="selected-task-time"
+                type="button"
+                aria-label="Edit selected task end time"
+                title="Edit end time"
+              >
+                <span class="selected-task-time__label">End</span>
+                <strong id="selectedTaskEndTime" class="selected-task-time__value">00:00:00</strong>
+              </button>
             </div>
+
+            <div class="selected-task-panel__actions">
+              <span class="field-block__hint">Delete removes this task together with its BIPs, rucks, and task log rows.</span>
+              <button id="deleteTaskBtn" class="aux-btn aux-btn--danger" type="button" title="Delete selected task" aria-label="Delete selected task">
+                <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <path d="M4 5h12M8 3h4M6 5l1 11h6l1-11M9 8v5m2-5v5" />
+                </svg>
+                Delete
+              </button>
+            </div>
+
           </section>
 
           <div class="export-row">
@@ -211,7 +211,7 @@
         <div class="timeline-workbench">
           <div id="timelineScale" class="timeline-scale" aria-hidden="true"></div>
           <div id="timelineEmpty" class="empty-state">
-            <p>Press Play, name the activity, then add tasks. Period stays editable during the activity.</p>
+            <p>Press Play, name the activity, then add tasks.</p>
           </div>
           <div id="timelineMap" class="timeline-map" role="list"></div>
         </div>
@@ -274,7 +274,50 @@
       </div>
     </div>
 
+    <div id="timePickerModal" class="time-picker-modal" hidden>
+      <div id="timePickerBackdrop" class="activity-modal__backdrop"></div>
+      <div class="time-picker-modal__card" role="dialog" aria-modal="true" aria-labelledby="timePickerTitle">
+        <p id="timePickerEyebrow" class="activity-modal__eyebrow">Edit task time</p>
+        <div class="time-picker-modal__head">
+          <h2 id="timePickerTitle" class="time-picker-modal__title">Set time</h2>
+          <p id="timePickerSubtitle" class="time-picker-modal__subtitle">Madrid time</p>
+        </div>
+        <p class="time-picker-modal__copy">Scroll or tap each wheel, then confirm the new task time.</p>
+
+        <div class="time-picker-modal__wheels" aria-label="Time picker">
+          <section class="time-picker-wheel" aria-labelledby="timePickerHourLabel">
+            <p id="timePickerHourLabel" class="time-picker-wheel__label">Hour</p>
+            <div class="time-picker-wheel__viewport">
+              <div class="time-picker-wheel__frame" aria-hidden="true"></div>
+              <div id="timePickerHourList" class="time-picker-wheel__list" role="listbox" aria-label="Hours"></div>
+            </div>
+          </section>
+
+          <section class="time-picker-wheel" aria-labelledby="timePickerMinuteLabel">
+            <p id="timePickerMinuteLabel" class="time-picker-wheel__label">Minute</p>
+            <div class="time-picker-wheel__viewport">
+              <div class="time-picker-wheel__frame" aria-hidden="true"></div>
+              <div id="timePickerMinuteList" class="time-picker-wheel__list" role="listbox" aria-label="Minutes"></div>
+            </div>
+          </section>
+
+          <section class="time-picker-wheel" aria-labelledby="timePickerSecondLabel">
+            <p id="timePickerSecondLabel" class="time-picker-wheel__label">Second</p>
+            <div class="time-picker-wheel__viewport">
+              <div class="time-picker-wheel__frame" aria-hidden="true"></div>
+              <div id="timePickerSecondList" class="time-picker-wheel__list" role="listbox" aria-label="Seconds"></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="time-picker-modal__actions">
+          <button id="timePickerCancelBtn" class="modal-btn" type="button">Cancel</button>
+          <button id="timePickerSaveBtn" class="modal-btn modal-btn--primary" type="button">Save time</button>
+        </div>
+      </div>
+    </div>
+
     <div id="srStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./app.js?v=20260406-4"></script>
+    <script src="./app.js?v=20260407-19"></script>
   </body>
 </html>

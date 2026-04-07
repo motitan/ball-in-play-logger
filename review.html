@@ -13,7 +13,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260406-14" />
+    <link rel="stylesheet" href="./styles.css?v=20260407-27" />
   </head>
   <body class="review-page">
     <div class="app-shell app-shell--review">
@@ -40,45 +40,59 @@
       </header>
 
       <main class="review-main">
-        <section class="review-overview">
-          <section class="review-hero">
+        <section id="reviewOverview" class="review-overview">
+          <section id="reviewHero" class="review-hero">
             <div class="review-hero__copy">
-              <p class="review-eyebrow">Current Session Review</p>
+              <div class="review-hero__head">
+                <p class="review-eyebrow">Current Session Review</p>
+                <div class="review-toggle review-toggle--hero" role="group" aria-label="Session metric basis">
+                  <button
+                    id="reviewModeTaskBtn"
+                    class="aux-btn review-toggle__btn review-toggle__btn--task"
+                    type="button"
+                    aria-pressed="true"
+                  >
+                    Task
+                  </button>
+                  <button
+                    id="reviewModeBipBtn"
+                    class="aux-btn review-toggle__btn review-toggle__btn--bip"
+                    type="button"
+                    aria-pressed="false"
+                  >
+                    BIP
+                  </button>
+                </div>
+              </div>
               <h1 id="reviewTitle" class="review-title">No active session</h1>
               <div class="review-meta">
                 <span id="reviewDate">Start a session in Logger to see the review.</span>
                 <span id="reviewWindow">Awaiting drill data</span>
               </div>
-            </div>
-            <div class="review-hero__side">
-              <div class="review-actions">
-                <button id="reviewExportCsvBtn" class="export-btn" type="button">CSV</button>
-                <button id="reviewExportJsonBtn" class="export-btn" type="button">JSON</button>
-                <button id="reviewExportZipBtn" class="export-btn" type="button">ZIP</button>
-              </div>
+              <p id="reviewModeNote" class="review-mode-note">Task view counts task windows as work and gaps between tasks as dead ball.</p>
             </div>
           </section>
 
           <section class="review-kpis" aria-label="Session metrics">
             <article class="review-kpi review-kpi--work">
-              <p class="review-kpi__label">Work</p>
+              <p id="kpiWorkLabel" class="review-kpi__label">BIP Time</p>
               <strong id="kpiWork" class="review-kpi__value">00:00</strong>
-              <span class="review-kpi__meta">Total ball in play</span>
+              <span id="kpiWorkMeta" class="review-kpi__meta">Total ball in play</span>
             </article>
             <article class="review-kpi review-kpi--rest">
-              <p class="review-kpi__label">Rest</p>
+              <p id="kpiRestLabel" class="review-kpi__label">Rest</p>
               <strong id="kpiRest" class="review-kpi__value">00:00</strong>
-              <span class="review-kpi__meta">Dead ball / recovery</span>
+              <span id="kpiRestMeta" class="review-kpi__meta">Dead ball / recovery</span>
             </article>
             <article class="review-kpi review-kpi--ratio review-kpi--gauge">
-              <p class="review-kpi__label">Ratio</p>
+              <p id="kpiRatioLabel" class="review-kpi__label">BIP %</p>
               <div id="ratioGauge" class="ratio-gauge" style="--ratio: 0deg;">
                 <span id="kpiRatio" class="ratio-gauge__value">0%</span>
               </div>
-              <span class="review-kpi__meta">Work to active window</span>
+              <span id="kpiRatioMeta" class="review-kpi__meta">BIP to active window</span>
             </article>
             <article class="review-kpi review-kpi--phase">
-              <p class="review-kpi__label">Phases</p>
+              <p class="review-kpi__label">Rucks</p>
               <strong id="kpiPhases" class="review-kpi__value">0</strong>
               <span class="review-kpi__meta">Total rucks</span>
             </article>
@@ -105,10 +119,10 @@
             <div class="review-panel__head">
               <div>
                 <p class="review-panel__eyebrow">Distribution</p>
-                <h2 class="review-panel__title">Phase Counts Per Task</h2>
+                <h2 id="phaseDistributionTitle" class="review-panel__title">Ruck Counts Per Task</h2>
               </div>
             </div>
-            <div id="phaseBuckets" class="bucket-list" aria-label="Phase count buckets"></div>
+            <div id="phaseBuckets" class="bucket-list" aria-label="Ruck count buckets"></div>
           </article>
         </section>
 
@@ -132,7 +146,7 @@
                   <th scope="col">Work</th>
                   <th scope="col">Rest</th>
                   <th scope="col">BIP %</th>
-                  <th scope="col">Phases</th>
+                  <th scope="col">Rucks</th>
                   <th scope="col">Drill</th>
                   <th scope="col">Total</th>
                 </tr>
@@ -145,6 +159,6 @@
     </div>
 
     <div id="reviewSrStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./review.js?v=20260406-4"></script>
+    <script src="./review.js?v=20260408-31"></script>
   </body>
 </html>

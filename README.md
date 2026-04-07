@@ -1,8 +1,32 @@
 # Ball In Play Logger
 
-Static rugby analysis app for logging live activity, reviewing the current session, and editing exported sessions without a backend.
+Static rugby analysis app for logging live activity, reviewing the current session, and editing exported sessions without a backend. It is built for Non-technical rugby coaches and performance analysts. The project is designed for fast use on iPhone and iPad, stores the active session in browser `localStorage`, and exports a flat analysis-friendly dataset in CSV, JSON, or ZIP form. It stands out through local-first storage and recovery, instant access from a live hosted build, analysis-friendly export workflow, and fast browser workflow for mobile devices.
 
-The project is designed for fast use on iPhone and iPad, stores the active session in browser `localStorage`, and exports a flat analysis-friendly dataset in CSV, JSON, or ZIP form.
+[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/motitan/ball-in-play-logger) [![Live App](https://img.shields.io/badge/live%20app-open-success)](https://motitan.github.io/ball-in-play-logger/)
+
+> [!NOTE]
+> No install required for normal use.
+
+- Live app: https://motitan.github.io/ball-in-play-logger/
+- Docs: https://github.com/motitan/ball-in-play-logger/tree/main/docs
+- Repository: https://github.com/motitan/ball-in-play-logger
+- License: `MIT`
+
+## Table of Contents
+
+- [Who It's For](#who-it-s-for)
+- [Use It Now](#use-it-now)
+- [What It Does](#what-it-does)
+- [Run Locally](#run-locally)
+- [Validate Locally](#validate-locally)
+- [Repo Structure](#repo-structure)
+- [Export Format](#export-format)
+- [License](#license)
+
+## Who It's For
+
+- Primary audience: Non-technical rugby coaches and performance analysts
+- Fastest path to value: Open the live app and start using it immediately.
 
 ## Use It Now
 
@@ -11,13 +35,7 @@ The project is designed for fast use on iPhone and iPad, stores the active sessi
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-motitan-FFDD00?logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/motitan)
 
-## License
-
-This project is open-source under the [MIT License](./LICENSE).
-
-## What The App Includes
-
-### Logger
+## What It Does
 
 - live match/activity clock
 - locked activity naming on start
@@ -26,35 +44,7 @@ This project is open-source under the [MIT License](./LICENSE).
 - ruck logging (`R`)
 - finish activity flow with confirmation
 - ZIP export containing both CSV and JSON
-
-### Review
-
 - current-session analytics view
-- work/rest/ratio/phase KPIs
-- BIP duration distribution
-- phase-count distribution by task
-- read-only task review table
-- export from the review page
-
-### Editor
-
-- import existing CSV, JSON, or ZIP exports
-- rebuild tasks, BIPs, and rucks from flat export rows
-- adjust task start and end times
-- rename imported tasks
-- align task start to first BIP and end to last BIP
-- re-export edited sessions as CSV, JSON, or ZIP
-
-## Repo Structure
-
-- `index.html`: Logger page
-- `review.html`: Review page
-- `editor.html`: Editor page
-- `styles.css`: shared styling for all pages
-- `app.js`: live logger logic and export pipeline
-- `review.js`: review rendering and export pipeline
-- `editor.js`: import, task editing, and re-export pipeline
-- `docs/export-schema.md`: export contract and column definitions
 
 ## Run Locally
 
@@ -84,9 +74,16 @@ node --check review.js
 node --check editor.js
 ```
 
-## Deploy
+## Repo Structure
 
-The app is configured to work as a static GitHub Pages site from the repository root. Push to `main` and GitHub Pages can serve it directly.
+- `index.html`: Logger page
+- `review.html`: Review page
+- `editor.html`: Editor page
+- `styles.css`: shared styling for all pages
+- `app.js`: live logger logic and export pipeline
+- `review.js`: review rendering and export pipeline
+- `editor.js`: import, task editing, and re-export pipeline
+- `docs/export-schema.md`: export contract and column definitions
 
 ## Export Format
 
@@ -123,12 +120,6 @@ Current shared export columns:
 
 See [docs/export-schema.md](./docs/export-schema.md) for full definitions and row-type behavior.
 
-## Notes For iPhone And iPad
+## License
 
-- Data stays in browser storage until reset or browser storage is cleared.
-- Safari downloads exports to the normal Downloads / Files flow.
-- ZIP is used instead of direct folder download because browsers do not reliably allow arbitrary folder creation from a static web app.
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+This project is open-source under the [MIT License](./LICENSE).

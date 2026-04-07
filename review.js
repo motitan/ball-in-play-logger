@@ -54,21 +54,30 @@
   ];
 
   const el = {
+    reviewOverview: document.getElementById("reviewOverview"),
+    reviewHero: document.getElementById("reviewHero"),
     reviewTopActivity: document.getElementById("reviewTopActivity"),
     reviewTopStatus: document.getElementById("reviewTopStatus"),
     reviewTitle: document.getElementById("reviewTitle"),
     reviewDate: document.getElementById("reviewDate"),
     reviewWindow: document.getElementById("reviewWindow"),
-    reviewExportCsvBtn: document.getElementById("reviewExportCsvBtn"),
-    reviewExportJsonBtn: document.getElementById("reviewExportJsonBtn"),
-    reviewExportZipBtn: document.getElementById("reviewExportZipBtn"),
+    reviewModeTaskBtn: document.getElementById("reviewModeTaskBtn"),
+    reviewModeBipBtn: document.getElementById("reviewModeBipBtn"),
+    reviewModeNote: document.getElementById("reviewModeNote"),
+    kpiWorkLabel: document.getElementById("kpiWorkLabel"),
     kpiWork: document.getElementById("kpiWork"),
+    kpiWorkMeta: document.getElementById("kpiWorkMeta"),
+    kpiRestLabel: document.getElementById("kpiRestLabel"),
     kpiRest: document.getElementById("kpiRest"),
+    kpiRestMeta: document.getElementById("kpiRestMeta"),
+    kpiRatioLabel: document.getElementById("kpiRatioLabel"),
     kpiRatio: document.getElementById("kpiRatio"),
+    kpiRatioMeta: document.getElementById("kpiRatioMeta"),
     ratioGauge: document.getElementById("ratioGauge"),
     kpiPhases: document.getElementById("kpiPhases"),
     kpiClock: document.getElementById("kpiClock"),
     durationBuckets: document.getElementById("durationBuckets"),
+    phaseDistributionTitle: document.getElementById("phaseDistributionTitle"),
     phaseBuckets: document.getElementById("phaseBuckets"),
     reviewTaskSummary: document.getElementById("reviewTaskSummary"),
     reviewEmpty: document.getElementById("reviewEmpty"),
@@ -79,6 +88,7 @@
 
   let session = loadSession();
   let tickTimer = null;
+  let overviewMetricMode = "task";
   const zipEncoder = new TextEncoder();
   const crcTable = buildCrcTable();
 
@@ -87,9 +97,8 @@
   syncClockTimer();
 
   function bindEvents() {
-    el.reviewExportCsvBtn.addEventListener("click", exportCsv);
-    el.reviewExportJsonBtn.addEventListener("click", exportJson);
-    el.reviewExportZipBtn.addEventListener("click", exportBundleZip);
+    el.reviewModeTaskBtn.addEventListener("click", () => setOverviewMetricMode("task"));
+    el.reviewModeBipBtn.addEventListener("click", () => setOverviewMetricMode("bip"));
 
     window.addEventListener("storage", (event) => {
       if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
@@ -104,6 +113,18 @@
         refreshSession();
       }
     });
+  }
+
+  function setOverviewMetricMode(nextMode) {
+    if (!["task", "bip"].includes(nextMode) || overviewMetricMode === nextMode) {
+      return;
+    }
+
+    overviewMetricMode = nextMode;
+    const snapshot = getReviewSnapshot();
+    renderHeader(snapshot);
+    renderKpis(snapshot);
+    renderDistributions(snapshot);
   }
 
   function refreshSession() {
@@ -121,6 +142,8 @@
   }
 
   function renderHeader(snapshot) {
+    const modeContent = getOverviewModeContent();
+    const metrics = snapshot.metricsByMode[overviewMetricMode];
     const statusLabel = snapshot.isFinished
       ? "Finished"
       : snapshot.clockState === "running"
@@ -135,28 +158,50 @@
     el.reviewTopStatus.classList.toggle("state-pill--running", snapshot.clockState === "running" && !snapshot.isFinished);
     el.reviewTopStatus.classList.toggle("state-pill--paused", snapshot.clockState !== "running" && !snapshot.isFinished);
     el.reviewTopStatus.classList.toggle("state-pill--finished", snapshot.isFinished);
+    el.reviewModeTaskBtn.setAttribute("aria-pressed", String(overviewMetricMode === "task"));
+    el.reviewModeBipBtn.setAttribute("aria-pressed", String(overviewMetricMode === "bip"));
+    el.reviewOverview.dataset.metricMode = overviewMetricMode;
+    el.reviewHero.dataset.metricMode = overviewMetricMode;
 
     el.reviewTitle.textContent = snapshot.activityLabel;
     el.reviewDate.textContent = snapshot.createdAt
       ? `Started ${formatReviewDate(snapshot.createdAt)}`
       : "Start a session in Logger to see the review.";
     el.reviewWindow.textContent = snapshot.hasTasks
-      ? `${snapshot.tasks.length} drills · ${snapshot.totalBips} BIPs · active window ${formatCompactDuration(snapshot.activeWindowMs)}`
+      ? `${snapshot.tasks.length} drills · ${snapshot.totalBips} BIPs · ${modeContent.windowLabel} ${formatCompactDuration(metrics.windowMs)}`
       : "Awaiting drill data";
+    el.reviewModeNote.textContent = modeContent.note;
   }
 
   function renderKpis(snapshot) {
-    el.kpiWork.textContent = formatCompactDuration(snapshot.workMs);
-    el.kpiRest.textContent = formatCompactDuration(snapshot.restMs);
-    el.kpiRatio.textContent = `${Math.round(snapshot.workRatio * 100)}%`;
-    el.ratioGauge.style.setProperty("--ratio", `${Math.round(snapshot.workRatio * 360)}deg`);
+    const modeContent = getOverviewModeContent();
+    const metrics = snapshot.metricsByMode[overviewMetricMode];
+
+    el.kpiWorkLabel.textContent = modeContent.workLabel;
+    el.kpiRestLabel.textContent = modeContent.restLabel;
+    el.kpiRatioLabel.textContent = modeContent.ratioLabel;
+    el.kpiWork.textContent = formatCompactDuration(metrics.workMs);
+    el.kpiRest.textContent = formatCompactDuration(metrics.restMs);
+    el.kpiRatio.textContent = `${Math.round(metrics.workRatio * 100)}%`;
+    el.kpiWorkMeta.textContent = modeContent.workMeta;
+    el.kpiRestMeta.textContent = modeContent.restMeta;
+    el.kpiRatioMeta.textContent = modeContent.ratioMeta;
+    el.ratioGauge.style.setProperty("--ratio", `${Math.round(metrics.workRatio * 360)}deg`);
+    el.ratioGauge.style.setProperty("--ratio-color", modeContent.ratioColor);
     el.kpiPhases.textContent = String(snapshot.totalRucks);
     el.kpiClock.textContent = formatClock(snapshot.elapsedMs);
   }
 
   function renderDistributions(snapshot) {
     el.durationBuckets.innerHTML = renderBucketList(snapshot.durationBuckets);
-    el.phaseBuckets.innerHTML = renderBucketList(snapshot.phaseBuckets);
+    const phaseBuckets = overviewMetricMode === "bip" ? snapshot.phaseBucketsByBip : snapshot.phaseBucketsByTask;
+    el.phaseDistributionTitle.textContent =
+      overviewMetricMode === "bip" ? "Ruck Counts Per BIP" : "Ruck Counts Per Task";
+    el.phaseBuckets.setAttribute(
+      "aria-label",
+      overviewMetricMode === "bip" ? "Ruck count buckets by bip" : "Ruck count buckets by task"
+    );
+    el.phaseBuckets.innerHTML = renderBucketList(phaseBuckets);
   }
 
   function renderBucketList(buckets) {
@@ -178,7 +223,7 @@
 
   function renderTaskTable(snapshot) {
     el.reviewTaskSummary.textContent = snapshot.hasTasks
-      ? `${snapshot.tasks.length} drills · ${snapshot.totalBips} BIPs · ${snapshot.totalRucks} phases`
+      ? `${snapshot.tasks.length} drills · ${snapshot.totalBips} BIPs · ${snapshot.totalRucks} rucks`
       : "No tasks logged yet.";
 
     if (!snapshot.hasTasks) {
@@ -203,7 +248,7 @@
                 <span class="review-badge${task.isActive ? " review-badge--live" : ""}">${task.isActive ? "Live" : "Task"}</span>
                 <span>${esc(task.name)}</span>
               </div>
-              <div class="review-table__task-meta">${task.bipCount} BIPs · ${task.ruckCount} phases · starts ${esc(formatCompactDuration(task.startElapsedMs))}</div>
+              <div class="review-table__task-meta">${task.bipCount} BIPs · ${task.ruckCount} rucks · starts ${esc(formatCompactDuration(task.startElapsedMs))}</div>
             </div>
           </td>
           <td class="review-table__metric">${esc(formatCompactDuration(task.durationMs))}</td>
@@ -221,8 +266,19 @@
     const activeWindowStartMs = hasTasks ? tasks[0].startElapsedMs : 0;
     const activeWindowEndMs = hasTasks ? Math.max(...tasks.map((task) => task.effectiveEndElapsedMs)) : 0;
     const activeWindowMs = hasTasks ? Math.max(0, activeWindowEndMs - activeWindowStartMs) : 0;
-    const workMs = tasks.reduce((sum, task) => sum + task.workMs, 0);
-    const restMs = Math.max(0, activeWindowMs - workMs);
+    const taskWindowEndMs =
+      hasTasks && session.clockState === "running" && !tasks.some((task) => task.isActive)
+        ? Math.max(activeWindowEndMs, elapsedMs)
+        : activeWindowEndMs;
+    const taskWindowMs = hasTasks ? Math.max(0, taskWindowEndMs - activeWindowStartMs) : 0;
+    const bipCoverage = summarizeCoverage(
+      tasks.flatMap((task) => task.bips.map((bip) => ({ startMs: bip.startElapsedMs, endMs: bip.effectiveEndElapsedMs })))
+    );
+    const taskCoverage = summarizeCoverage(
+      tasks.map((task) => ({ startMs: task.startElapsedMs, endMs: task.effectiveEndElapsedMs }))
+    );
+    const bipWorkMs = Math.min(activeWindowMs, bipCoverage.coveredMs);
+    const taskWorkMs = Math.min(activeWindowMs, taskCoverage.coveredMs);
     const totalRucks = tasks.reduce((sum, task) => sum + task.ruckCount, 0);
     const totalBips = tasks.reduce((sum, task) => sum + task.bipCount, 0);
 
@@ -234,9 +290,20 @@
       activityLabel: exportActivityLabel(session.activityName),
       hasTasks,
       tasks,
-      workMs,
-      restMs,
-      workRatio: activeWindowMs > 0 ? workMs / activeWindowMs : 0,
+      metricsByMode: {
+        bip: {
+          workMs: bipWorkMs,
+          restMs: Math.max(0, activeWindowMs - bipWorkMs),
+          workRatio: activeWindowMs > 0 ? bipWorkMs / activeWindowMs : 0,
+          windowMs: activeWindowMs,
+        },
+        task: {
+          workMs: taskWorkMs,
+          restMs: Math.max(0, taskWindowMs - taskWorkMs),
+          workRatio: taskWindowMs > 0 ? taskWorkMs / taskWindowMs : 0,
+          windowMs: taskWindowMs,
+        },
+      },
       totalRucks,
       totalBips,
       activeWindowMs,
@@ -244,8 +311,12 @@
         tasks.flatMap((task) => task.bips.map((bip) => bip.durationMs / 1000)),
         DURATION_BUCKETS
       ),
-      phaseBuckets: buildBucketCounts(
+      phaseBucketsByTask: buildBucketCounts(
         tasks.map((task) => task.ruckCount),
+        PHASE_BUCKETS
+      ),
+      phaseBucketsByBip: buildBucketCounts(
+        tasks.flatMap((task) => task.bips.map((bip) => bip.ruckCount)),
         PHASE_BUCKETS
       ),
     };
@@ -253,12 +324,20 @@
 
   function toReviewTask(task, currentElapsedMs) {
     const effectiveEndElapsedMs = taskEndMs(task, currentElapsedMs);
+    const ruckCountsByBipId = task.rucks.reduce((map, ruck) => {
+      if (!ruck.bipId) {
+        return map;
+      }
+      map.set(ruck.bipId, (map.get(ruck.bipId) || 0) + 1);
+      return map;
+    }, new Map());
     const bips = task.bips.map((bip) => {
       const effectiveBipEndElapsedMs = bipEndMs(bip, currentElapsedMs);
       return {
         ...bip,
         effectiveEndElapsedMs: effectiveBipEndElapsedMs,
         durationMs: Math.max(0, effectiveBipEndElapsedMs - bip.startElapsedMs),
+        ruckCount: ruckCountsByBipId.get(bip.id) || 0,
       };
     });
     const workMs = bips.reduce((sum, bip) => sum + bip.durationMs, 0);
@@ -276,6 +355,66 @@
       bipCount: bips.length,
       ruckCount: task.rucks.length,
       isActive: task.endElapsedMs == null && session.activeTaskId === task.id,
+    };
+  }
+
+  function summarizeCoverage(windows) {
+    const normalized = windows
+      .map((window) => ({
+        startMs: normMs(window.startMs),
+        endMs: Math.max(normMs(window.startMs), normMs(window.endMs)),
+      }))
+      .sort((left, right) => left.startMs - right.startMs);
+
+    if (!normalized.length) {
+      return { coveredMs: 0 };
+    }
+
+    let coveredMs = 0;
+    let currentStart = normalized[0].startMs;
+    let currentEnd = normalized[0].endMs;
+
+    for (let index = 1; index < normalized.length; index += 1) {
+      const window = normalized[index];
+      if (window.startMs <= currentEnd) {
+        currentEnd = Math.max(currentEnd, window.endMs);
+        continue;
+      }
+
+      coveredMs += Math.max(0, currentEnd - currentStart);
+      currentStart = window.startMs;
+      currentEnd = window.endMs;
+    }
+
+    coveredMs += Math.max(0, currentEnd - currentStart);
+    return { coveredMs };
+  }
+
+  function getOverviewModeContent() {
+    if (overviewMetricMode === "task") {
+      return {
+        workLabel: "Task Time",
+        restLabel: "Gap Rest",
+        ratioLabel: "Task %",
+        workMeta: "Total drill windows",
+        restMeta: "Dead ball between tasks",
+        ratioMeta: "Task time to task window",
+        note: "Task view counts task windows as work and gaps between tasks as dead ball.",
+        windowLabel: "task window",
+        ratioColor: "rgba(204, 133, 88, 0.96)",
+      };
+    }
+
+    return {
+      workLabel: "BIP Time",
+      restLabel: "Rest",
+      ratioLabel: "BIP %",
+      workMeta: "Total ball in play",
+      restMeta: "Dead ball / recovery",
+      ratioMeta: "BIP to active window",
+      note: "BIP view counts dead-ball time inside drills as rest so live ball exposure is easy to read.",
+      windowLabel: "active window",
+      ratioColor: "rgba(136, 188, 108, 0.95)",
     };
   }
 
@@ -698,17 +837,22 @@
 
   function loadSession() {
     try {
+      const liveSession = loadLiveSession();
       const reviewSource = loadEditorReviewSource();
-      if (reviewSource) {
-        return reviewSource;
+      if (shouldPreferLiveSession(liveSession)) {
+        return mergeOverlayIntoSession(liveSession, reviewSource);
       }
 
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? normalizeSession(JSON.parse(raw)) : createSession();
+      return reviewSource || liveSession;
     } catch (error) {
       console.error("Unable to load session", error);
       return createSession();
     }
+  }
+
+  function loadLiveSession() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? normalizeSession(JSON.parse(raw)) : createSession();
   }
 
   function loadEditorReviewSource() {
@@ -733,6 +877,72 @@
       console.error("Unable to load review source", error);
       return null;
     }
+  }
+
+  function shouldPreferLiveSession(candidate) {
+    return (
+      candidate &&
+      candidate.isFinished !== true &&
+      (
+        candidate.clockState === "running" ||
+        hasValue(candidate.activityName) ||
+        candidate.tasks.length > 0 ||
+        candidate.events.length > 0 ||
+        normMs(candidate.elapsedMs) > 0
+      )
+    );
+  }
+
+  function mergeOverlayIntoSession(liveSession, reviewSource) {
+    if (!reviewSource || reviewSource.sessionId !== liveSession.sessionId || !reviewSource.tasks.length) {
+      return liveSession;
+    }
+
+    const overlayTasks = new Map(reviewSource.tasks.map((task) => [task.id, task]));
+    return {
+      ...liveSession,
+      tasks: liveSession.tasks.map((task) => {
+        const overlayTask = overlayTasks.get(task.id);
+        if (!overlayTask) {
+          return task;
+        }
+
+        const keepLiveEnd =
+          liveSession.isFinished !== true &&
+          liveSession.activeTaskId === task.id &&
+          task.endElapsedMs == null;
+
+        return {
+          ...task,
+          name: typeof overlayTask.name === "string" && overlayTask.name ? overlayTask.name : task.name,
+          period: typeof overlayTask.period === "string" ? overlayTask.period : task.period,
+          startElapsedMs:
+            isTaskStartAlignedToFirstBip(overlayTask) && task.bips.length
+              ? normMs(task.bips[0].startElapsedMs)
+              : task.startElapsedMs,
+          endElapsedMs:
+            keepLiveEnd
+              ? task.endElapsedMs
+              : isTaskEndAlignedToLastBip(overlayTask) && task.bips.length
+              ? task.bips[task.bips.length - 1].endElapsedMs
+              : task.endElapsedMs,
+        };
+      }),
+    };
+  }
+
+  function isTaskStartAlignedToFirstBip(task) {
+    return Boolean(task?.bips?.length) && normMs(task.startElapsedMs) === normMs(task.bips[0].startElapsedMs);
+  }
+
+  function isTaskEndAlignedToLastBip(task) {
+    if (!task?.bips?.length) {
+      return false;
+    }
+    const lastBip = task.bips[task.bips.length - 1];
+    const taskEndElapsedMs = task.endElapsedMs == null ? normMs(lastBip.endElapsedMs) : normMs(task.endElapsedMs);
+    const lastBipEndElapsedMs = lastBip.endElapsedMs == null ? taskEndElapsedMs : normMs(lastBip.endElapsedMs);
+    return taskEndElapsedMs === lastBipEndElapsedMs;
   }
 
   function createSession() {

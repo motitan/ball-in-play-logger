@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
+  const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
   const DEFAULT_PERIOD = "";
   const DEFAULT_ACTIVITY = "Activity";
   const PROMPT_ACTIVITY = "Start activity";
@@ -7,6 +8,29 @@
   const EXPORT_PERIOD = "Untitled Period";
   const CLOCK_TICK_MS = 250;
   const RUCK_WINDOW_MS = 1500;
+  const MADRID_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Madrid",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const MADRID_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const MADRID_DATE_LABEL_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Madrid",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
   const MAX_ACTIVITY = 64;
   const MAX_PERIOD = 48;
@@ -20,6 +44,15 @@
     bip_start: "BIP Start",
     bip_end: "BIP End",
     ruck: "Ruck",
+  };
+  const EVENT_SORT_ORDER = {
+    play: 0,
+    task_start: 1,
+    bip_start: 2,
+    ruck: 3,
+    bip_end: 4,
+    task_end: 5,
+    pause: 6,
   };
 
   const ICON_TASK_ADD = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
@@ -51,8 +84,11 @@
     selectedTaskState: document.getElementById("selectedTaskState"),
     selectedTaskMeta: document.getElementById("selectedTaskMeta"),
     selectedTaskNameInput: document.getElementById("selectedTaskNameInput"),
-    selectedTaskActionBtn: document.getElementById("selectedTaskActionBtn"),
-    clearTaskSelectionBtn: document.getElementById("clearTaskSelectionBtn"),
+    selectedTaskStartBtn: document.getElementById("selectedTaskStartBtn"),
+    selectedTaskStartTime: document.getElementById("selectedTaskStartTime"),
+    selectedTaskEndBtn: document.getElementById("selectedTaskEndBtn"),
+    selectedTaskEndTime: document.getElementById("selectedTaskEndTime"),
+    deleteTaskBtn: document.getElementById("deleteTaskBtn"),
     exportCsvBtn: document.getElementById("exportCsvBtn"),
     exportJsonBtn: document.getElementById("exportJsonBtn"),
     resetBtn: document.getElementById("resetBtn"),
@@ -76,17 +112,29 @@
     activityModalInput: document.getElementById("activityModalInput"),
     activityModalError: document.getElementById("activityModalError"),
     activityCancelBtn: document.getElementById("activityCancelBtn"),
+    timePickerModal: document.getElementById("timePickerModal"),
+    timePickerBackdrop: document.getElementById("timePickerBackdrop"),
+    timePickerEyebrow: document.getElementById("timePickerEyebrow"),
+    timePickerTitle: document.getElementById("timePickerTitle"),
+    timePickerSubtitle: document.getElementById("timePickerSubtitle"),
+    timePickerHourList: document.getElementById("timePickerHourList"),
+    timePickerMinuteList: document.getElementById("timePickerMinuteList"),
+    timePickerSecondList: document.getElementById("timePickerSecondList"),
+    timePickerCancelBtn: document.getElementById("timePickerCancelBtn"),
+    timePickerSaveBtn: document.getElementById("timePickerSaveBtn"),
     srStatus: document.getElementById("srStatus"),
   };
 
   const saveState = { available: true, lastSavedAt: null };
   let session = loadSession();
+  let reviewOverlaySession = loadReviewSourceSession();
   let tickTimer = null;
   let pendingPlayAfterNaming = false;
   let selectionCleared = false;
   let selectedTaskId = session.activeTaskId || session.tasks.at(-1)?.id || null;
   let finishConfirmExpiresAt = 0;
   let finishConfirmTimer = null;
+  let timePickerState = createTimePickerState();
   const zipEncoder = new TextEncoder();
   const crcTable = buildCrcTable();
 
@@ -101,10 +149,14 @@
     el.taskBtn.addEventListener("click", handlePrimaryTaskAction);
     el.bipBtn.addEventListener("click", toggleBip);
     el.ruckBtn.addEventListener("click", addRuck);
-    el.periodInput.addEventListener("input", handlePeriodInput);
+    if (el.periodInput) {
+      el.periodInput.addEventListener("input", handlePeriodInput);
+    }
     el.selectedTaskNameInput.addEventListener("input", handleSelectedTaskRename);
-    el.selectedTaskActionBtn.addEventListener("click", handleSelectedTaskAction);
-    el.clearTaskSelectionBtn.addEventListener("click", clearTaskSelection);
+    el.selectedTaskNameInput.addEventListener("blur", commitSelectedTaskRename);
+    el.selectedTaskStartBtn.addEventListener("click", () => handleSelectedTaskBoundaryEdit("start"));
+    el.selectedTaskEndBtn.addEventListener("click", () => handleSelectedTaskBoundaryEdit("end"));
+    el.deleteTaskBtn.addEventListener("click", handleDeleteTaskIntent);
     el.exportCsvBtn.addEventListener("click", exportCsv);
     el.exportJsonBtn.addEventListener("click", exportJson);
     el.resetBtn.addEventListener("click", resetSession);
@@ -114,14 +166,47 @@
     el.timelineMap.addEventListener("click", handleTimelineClick);
     el.activityForm.addEventListener("submit", handleActivitySubmit);
     el.activityCancelBtn.addEventListener("click", closeActivityModal);
+    el.timePickerBackdrop.addEventListener("click", closeTimePickerModal);
+    el.timePickerCancelBtn.addEventListener("click", closeTimePickerModal);
+    el.timePickerSaveBtn.addEventListener("click", handleTimePickerSave);
+    el.timePickerHourList.addEventListener("click", (event) => handleTimeWheelClick("hour", event));
+    el.timePickerMinuteList.addEventListener("click", (event) => handleTimeWheelClick("minute", event));
+    el.timePickerSecondList.addEventListener("click", (event) => handleTimeWheelClick("second", event));
+    el.timePickerHourList.addEventListener("scroll", () => handleTimeWheelScroll("hour"));
+    el.timePickerMinuteList.addEventListener("scroll", () => handleTimeWheelScroll("minute"));
+    el.timePickerSecondList.addEventListener("scroll", () => handleTimeWheelScroll("second"));
     document.addEventListener("keydown", handleKeydown);
     document.addEventListener("visibilitychange", () => {
-      renderClock();
-      if (!document.hidden) announce("View refreshed.");
+      if (!document.hidden) {
+        refreshExternalState();
+        announce("View refreshed.");
+      }
     });
+    window.addEventListener("storage", handleExternalStorageSync);
+    window.addEventListener("focus", refreshExternalState);
+  }
+
+  function handleExternalStorageSync(event) {
+    if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
+      return;
+    }
+
+    refreshExternalState();
+  }
+
+  function refreshExternalState() {
+    session = loadSession();
+    reviewOverlaySession = loadReviewSourceSession();
+    renderAll();
+    syncClockTimer();
   }
 
   function handleKeydown(event) {
+    if (event.key === "Escape" && !el.timePickerModal.hidden) {
+      closeTimePickerModal();
+      return;
+    }
+
     if (event.key === "Escape" && !el.activityModal.hidden) {
       closeActivityModal();
     }
@@ -139,9 +224,288 @@
       return;
     }
 
-    task.name = taskLabel(event.target.value, getTaskOrdinal(task.id));
+    task.name = String(event.target.value || "").slice(0, MAX_TASK);
+    syncTaskEventNames(task);
+    persistSession("Task name updated.");
+    renderAll();
+  }
+
+  function commitSelectedTaskRename() {
+    const task = getSelectedTaskFromSession();
+    if (!task) {
+      return;
+    }
+
+    task.name = taskLabel(task.name, getTaskOrdinal(task.id));
+    syncTaskEventNames(task);
     persistSession(`Task renamed: ${task.name}.`);
     renderAll();
+  }
+
+  function handleSelectedTaskBoundaryEdit(boundary) {
+    if (session.isFinished) {
+      return;
+    }
+
+    const task = getSelectedTaskFromSession();
+    if (!task) {
+      return;
+    }
+
+    if (boundary === "end" && task.endElapsedMs === null) {
+      window.alert("Stop the live task before setting a fixed end time.");
+      return;
+    }
+
+    openTimePickerModal(task, boundary);
+  }
+
+  function openTimePickerModal(task, boundary) {
+    const anchorUnixMs = getTaskBoundaryAnchorUnixMs(task, boundary);
+    const parts = getMadridDateParts(anchorUnixMs);
+    if (!parts) {
+      window.alert("Unable to open the time picker for this task.");
+      return;
+    }
+
+    timePickerState = {
+      ...createTimePickerState(),
+      open: true,
+      boundary,
+      taskId: task.id,
+      anchorUnixMs,
+      hour: parts.hour,
+      minute: parts.minute,
+      second: parts.second,
+      restoreFocusId: boundary === "start" ? "selectedTaskStartBtn" : "selectedTaskEndBtn",
+    };
+
+    renderTimePickerModal();
+    window.requestAnimationFrame(() => {
+      syncTimePickerWheelPositions();
+      el.timePickerSaveBtn.focus();
+    });
+  }
+
+  function closeTimePickerModal(restoreFocus = true) {
+    clearTimePickerScrollTimers();
+    el.timePickerModal.hidden = true;
+
+    const restoreFocusId = timePickerState.restoreFocusId;
+    timePickerState = createTimePickerState();
+
+    if (restoreFocus && restoreFocusId) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(restoreFocusId)?.focus();
+      });
+    }
+  }
+
+  function handleTimePickerSave() {
+    if (!timePickerState.open) {
+      return;
+    }
+
+    const boundary = timePickerState.boundary;
+    const task = findTask(session.tasks, timePickerState.taskId);
+    if (!task) {
+      closeTimePickerModal(false);
+      return;
+    }
+
+    const targetUnixMs = resolveMadridClockUnixMs(
+      timePickerState.anchorUnixMs,
+      timePickerState.hour,
+      timePickerState.minute,
+      timePickerState.second
+    );
+    if (targetUnixMs === null) {
+      window.alert("Unable to resolve that Madrid time.");
+      return;
+    }
+
+    let targetElapsedMs = resolveElapsedMsFromUnixMs(targetUnixMs);
+    if (targetElapsedMs === null) {
+      const sessionZeroUnixMs = getSessionZeroUnixMs();
+      const canShiftSessionEarlier =
+        boundary === "start" &&
+        isEarliestTask(task) &&
+        Number.isFinite(sessionZeroUnixMs) &&
+        targetUnixMs < sessionZeroUnixMs;
+
+      if (canShiftSessionEarlier) {
+        shiftSessionOriginEarlier(sessionZeroUnixMs - targetUnixMs, targetUnixMs);
+        targetElapsedMs = 0;
+      } else {
+        window.alert("That time is outside the running session clock. Pick a time recorded while the clock was live.");
+        return;
+      }
+    }
+
+    const validationError = validateTaskBoundaryChange(task, boundary, targetElapsedMs);
+    if (validationError) {
+      window.alert(validationError);
+      return;
+    }
+
+    applyTaskBoundaryChange(task, boundary, targetElapsedMs, targetUnixMs);
+    closeTimePickerModal();
+    persistSession(`Task ${boundary} updated: ${task.name}.`);
+    renderAll();
+  }
+
+  function renderTimePickerModal() {
+    if (!timePickerState.open) {
+      el.timePickerModal.hidden = true;
+      return;
+    }
+
+    const task = findTask(session.tasks, timePickerState.taskId);
+    if (!task) {
+      closeTimePickerModal(false);
+      return;
+    }
+
+    const boundaryLabel = timePickerState.boundary === "start" ? "Start" : "End";
+    el.timePickerModal.hidden = false;
+    el.timePickerEyebrow.textContent = `Edit ${boundaryLabel.toLowerCase()} time`;
+    el.timePickerTitle.textContent = `${task.name} ${boundaryLabel}`;
+    el.timePickerSubtitle.textContent = `${fmtMadridDate(timePickerState.anchorUnixMs)} · Madrid time`;
+    el.timePickerSaveBtn.textContent = `Save ${boundaryLabel.toLowerCase()} time`;
+    el.timePickerHourList.innerHTML = buildTimeWheelOptions(24, timePickerState.hour, "hour");
+    el.timePickerMinuteList.innerHTML = buildTimeWheelOptions(60, timePickerState.minute, "minute");
+    el.timePickerSecondList.innerHTML = buildTimeWheelOptions(60, timePickerState.second, "second");
+    window.requestAnimationFrame(syncTimePickerWheelPositions);
+  }
+
+  function buildTimeWheelOptions(count, selectedValue, part) {
+    return Array.from({ length: count }, (_, value) => `
+      <button
+        class="time-picker-wheel__option${value === selectedValue ? " time-picker-wheel__option--selected" : ""}"
+        type="button"
+        role="option"
+        aria-selected="${String(value === selectedValue)}"
+        data-time-part="${part}"
+        data-time-value="${value}"
+      >
+        ${esc(pad2(value))}
+      </button>
+    `).join("");
+  }
+
+  function handleTimeWheelClick(part, event) {
+    const option = event.target.closest("[data-time-value]");
+    if (!option || !timePickerState.open) {
+      return;
+    }
+
+    setTimePickerValue(part, Number(option.dataset.timeValue), true);
+  }
+
+  function handleTimeWheelScroll(part) {
+    if (!timePickerState.open || timePickerState.syncScroll) {
+      return;
+    }
+
+    window.clearTimeout(timePickerState.scrollTimers[part]);
+    timePickerState.scrollTimers[part] = window.setTimeout(() => {
+      const list = getTimeWheelList(part);
+      if (!list) {
+        return;
+      }
+
+      const nextValue = getNearestTimeWheelValue(list);
+      setTimePickerValue(part, nextValue, false);
+      syncTimePickerWheelPositions();
+    }, 90);
+  }
+
+  function setTimePickerValue(part, value, syncScroll = true) {
+    timePickerState[part] = Math.max(0, Math.round(value));
+    renderTimePickerModal();
+    if (syncScroll) {
+      window.requestAnimationFrame(syncTimePickerWheelPositions);
+    }
+  }
+
+  function syncTimePickerWheelPositions() {
+    if (!timePickerState.open) {
+      return;
+    }
+
+    timePickerState.syncScroll = true;
+    scrollTimeWheelToValue(el.timePickerHourList, timePickerState.hour);
+    scrollTimeWheelToValue(el.timePickerMinuteList, timePickerState.minute);
+    scrollTimeWheelToValue(el.timePickerSecondList, timePickerState.second);
+    window.setTimeout(() => {
+      timePickerState.syncScroll = false;
+    }, 40);
+  }
+
+  function scrollTimeWheelToValue(list, value) {
+    const option = list?.querySelector(`[data-time-value="${value}"]`);
+    if (!list || !option) {
+      return;
+    }
+
+    const targetTop = option.offsetTop - (list.clientHeight - option.clientHeight) / 2;
+    list.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+  }
+
+  function getNearestTimeWheelValue(list) {
+    const options = [...list.querySelectorAll("[data-time-value]")];
+    if (!options.length) {
+      return 0;
+    }
+
+    const center = list.scrollTop + list.clientHeight / 2;
+    let nearestValue = Number(options[0].dataset.timeValue);
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    options.forEach((option) => {
+      const optionCenter = option.offsetTop + option.clientHeight / 2;
+      const distance = Math.abs(optionCenter - center);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestValue = Number(option.dataset.timeValue);
+      }
+    });
+
+    return nearestValue;
+  }
+
+  function getTimeWheelList(part) {
+    if (part === "hour") {
+      return el.timePickerHourList;
+    }
+    if (part === "minute") {
+      return el.timePickerMinuteList;
+    }
+    return el.timePickerSecondList;
+  }
+
+  function clearTimePickerScrollTimers() {
+    Object.values(timePickerState.scrollTimers).forEach((timerId) => window.clearTimeout(timerId));
+  }
+
+  function handleDeleteTaskIntent() {
+    if (session.isFinished) {
+      return;
+    }
+
+    const task = getSelectedTaskFromSession();
+    if (!task) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${task.name}? This removes the task, its BIPs, its rucks, and related task log rows.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    deleteTask(task.id);
   }
 
   function handlePlayIntent() {
@@ -458,6 +822,386 @@
     renderAll();
   }
 
+  function deleteTask(taskId) {
+    const taskIndex = session.tasks.findIndex((task) => task.id === taskId);
+    if (taskIndex < 0) {
+      return;
+    }
+
+    const [task] = session.tasks.splice(taskIndex, 1);
+    const removedBipIds = new Set(task.bips.map((bip) => bip.id));
+
+    if (session.activeTaskId === task.id) {
+      session.activeTaskId = null;
+    }
+
+    if (session.activeBipId && removedBipIds.has(session.activeBipId)) {
+      session.activeBipId = null;
+    }
+
+    session.events = session.events
+      .filter((eventItem) => eventItem.taskId !== task.id && !(eventItem.bipId && removedBipIds.has(eventItem.bipId)))
+      .map((eventItem, index) => ({ ...eventItem, index: index + 1 }));
+
+    const fallbackTask = session.tasks[Math.min(taskIndex, session.tasks.length - 1)] || session.tasks.at(-1) || null;
+    if (fallbackTask) {
+      setSelectedTask(fallbackTask.id);
+    } else {
+      selectedTaskId = null;
+      selectionCleared = false;
+    }
+
+    persistSession(`Task deleted: ${task.name}.`);
+    renderAll();
+  }
+
+  function getTaskBoundaryAnchorUnixMs(task, boundary) {
+    if (boundary === "start") {
+      return getTaskStartUnixMs(task);
+    }
+    return getTaskEndUnixMs(task, task.closedAt || task.createdAt);
+  }
+
+  function resolveMadridClockUnixMs(anchorUnixMs, hour, minute, second) {
+    if (
+      !Number.isInteger(hour) ||
+      !Number.isInteger(minute) ||
+      !Number.isInteger(second) ||
+      hour < 0 ||
+      minute < 0 ||
+      second < 0 ||
+      hour > 23 ||
+      minute > 59 ||
+      second > 59
+    ) {
+      return null;
+    }
+
+    const anchorParts = getMadridDateParts(anchorUnixMs);
+    if (!anchorParts) {
+      return null;
+    }
+
+    const baseUnixMs = Date.UTC(anchorParts.year, anchorParts.month - 1, anchorParts.day, hour, minute, second);
+    for (const offsetHours of [2, 1, 0]) {
+      const candidateUnixMs = baseUnixMs - offsetHours * 60 * 60 * 1000;
+      const candidateParts = getMadridDateParts(candidateUnixMs);
+      if (
+        candidateParts &&
+        candidateParts.year === anchorParts.year &&
+        candidateParts.month === anchorParts.month &&
+        candidateParts.day === anchorParts.day &&
+        candidateParts.hour === hour &&
+        candidateParts.minute === minute &&
+        candidateParts.second === second
+      ) {
+        return candidateUnixMs;
+      }
+    }
+
+    return null;
+  }
+
+  function getMadridDateParts(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    const parts = Object.create(null);
+    MADRID_DATE_TIME_FORMATTER.formatToParts(date).forEach((part) => {
+      if (part.type !== "literal") {
+        parts[part.type] = part.value;
+      }
+    });
+
+    return {
+      year: Number(parts.year),
+      month: Number(parts.month),
+      day: Number(parts.day),
+      hour: Number(parts.hour),
+      minute: Number(parts.minute),
+      second: Number(parts.second),
+    };
+  }
+
+  function getSessionZeroUnixMs() {
+    const firstPlayEvent = session.events.find((eventItem) => eventItem.type === "play" && toUnixMs(eventItem.createdAt) !== "");
+    if (firstPlayEvent) {
+      return toUnixMs(firstPlayEvent.createdAt) - normMs(firstPlayEvent.elapsedMs);
+    }
+
+    const createdAtUnixMs = toUnixMs(session.createdAt);
+    return createdAtUnixMs === "" ? null : createdAtUnixMs;
+  }
+
+  function isEarliestTask(task) {
+    const earliestTask = session.tasks.reduce((earliest, candidate) => {
+      if (!earliest) {
+        return candidate;
+      }
+      return normMs(candidate.startElapsedMs) < normMs(earliest.startElapsedMs) ? candidate : earliest;
+    }, null);
+
+    return Boolean(earliestTask) && earliestTask.id === task.id;
+  }
+
+  function shiftSessionOriginEarlier(shiftMs, nextSessionZeroUnixMs) {
+    const safeShiftMs = Math.max(0, Math.round(shiftMs));
+    if (!safeShiftMs) {
+      return;
+    }
+
+    session.elapsedMs = normMs(session.elapsedMs) + safeShiftMs;
+    session.tasks.forEach((task) => {
+      task.startElapsedMs = normMs(task.startElapsedMs) + safeShiftMs;
+      if (task.endElapsedMs !== null) {
+        task.endElapsedMs = normMs(task.endElapsedMs) + safeShiftMs;
+      }
+
+      task.bips.forEach((bip) => {
+        bip.startElapsedMs = normMs(bip.startElapsedMs) + safeShiftMs;
+        if (bip.endElapsedMs !== null) {
+          bip.endElapsedMs = normMs(bip.endElapsedMs) + safeShiftMs;
+        }
+      });
+
+      task.rucks.forEach((ruck) => {
+        ruck.elapsedMs = normMs(ruck.elapsedMs) + safeShiftMs;
+      });
+    });
+
+    session.events.forEach((eventItem) => {
+      eventItem.elapsedMs = normMs(eventItem.elapsedMs) + safeShiftMs;
+    });
+
+    const currentCreatedAtUnixMs = toUnixMs(session.createdAt);
+    const nextCreatedAtUnixMs =
+      currentCreatedAtUnixMs === ""
+        ? nextSessionZeroUnixMs
+        : Math.min(currentCreatedAtUnixMs, nextSessionZeroUnixMs);
+    session.createdAt = new Date(nextCreatedAtUnixMs).toISOString();
+  }
+
+  function resolveElapsedMsFromUnixMs(targetUnixMs) {
+    if (!Number.isFinite(targetUnixMs)) {
+      return null;
+    }
+
+    const sessionZeroUnixMs = getSessionZeroUnixMs();
+    const firstPlayEvent = session.events.find((eventItem) => eventItem.type === "play" && toUnixMs(eventItem.createdAt) !== "");
+    if (Number.isFinite(sessionZeroUnixMs) && firstPlayEvent) {
+      const firstPlayUnixMs = toUnixMs(firstPlayEvent.createdAt);
+      if (targetUnixMs >= sessionZeroUnixMs && targetUnixMs <= firstPlayUnixMs) {
+        return Math.max(0, Math.round(targetUnixMs - sessionZeroUnixMs));
+      }
+    }
+
+    let liveSegment = null;
+    for (const eventItem of session.events) {
+      if (eventItem.type === "play") {
+        const startUnixMs = toUnixMs(eventItem.createdAt);
+        if (startUnixMs === "") {
+          continue;
+        }
+
+        liveSegment = {
+          startUnixMs,
+          startElapsedMs: normMs(eventItem.elapsedMs),
+        };
+        continue;
+      }
+
+      if (eventItem.type === "pause" && liveSegment) {
+        const resolvedElapsedMs = resolveElapsedMsInsideSegment(
+          liveSegment,
+          {
+            endUnixMs: toUnixMs(eventItem.createdAt),
+            endElapsedMs: normMs(eventItem.elapsedMs),
+          },
+          targetUnixMs
+        );
+        if (resolvedElapsedMs !== null) {
+          return resolvedElapsedMs;
+        }
+
+        liveSegment = null;
+      }
+    }
+
+    if (liveSegment && session.clockState === "running" && session.lastStartedAt) {
+      const now = new Date();
+      return resolveElapsedMsInsideSegment(
+        liveSegment,
+        {
+          endUnixMs: now.getTime(),
+          endElapsedMs: getCurrentElapsedMs(now),
+        },
+        targetUnixMs
+      );
+    }
+
+    return null;
+  }
+
+  function resolveElapsedMsInsideSegment(segment, endPoint, targetUnixMs) {
+    if (
+      !segment ||
+      !Number.isFinite(segment.startUnixMs) ||
+      !Number.isFinite(endPoint?.endUnixMs) ||
+      targetUnixMs < segment.startUnixMs ||
+      targetUnixMs > endPoint.endUnixMs
+    ) {
+      return null;
+    }
+
+    return Math.max(
+      normMs(segment.startElapsedMs),
+      Math.min(normMs(endPoint.endElapsedMs), normMs(segment.startElapsedMs) + (targetUnixMs - segment.startUnixMs))
+    );
+  }
+
+  function validateTaskBoundaryChange(task, boundary, nextElapsedMs) {
+    const currentElapsedMs = getCurrentElapsedMs();
+    const nextStartElapsedMs = boundary === "start" ? nextElapsedMs : normMs(task.startElapsedMs);
+    const nextEndElapsedMs = boundary === "end" ? nextElapsedMs : taskEndMs(task, currentElapsedMs);
+
+    if (nextStartElapsedMs > nextEndElapsedMs) {
+      return boundary === "start"
+        ? "Warning: start time cannot be after the task end."
+        : "Warning: end time cannot be before the task start.";
+    }
+
+    if (task.bips.length) {
+      const firstBipStartElapsedMs = Math.min(...task.bips.map((bip) => normMs(bip.startElapsedMs)));
+      const lastBipEndElapsedMs = Math.max(...task.bips.map((bip) => bipEndMs(bip, currentElapsedMs)));
+
+      if (nextStartElapsedMs > firstBipStartElapsedMs) {
+        return `Warning: ${task.name} would start after its first BIP.`;
+      }
+
+      if (nextEndElapsedMs < lastBipEndElapsedMs) {
+        return `Warning: ${task.name} would end before its last BIP.`;
+      }
+    }
+
+    const overlappingTask = findOverlappingTask(task.id, nextStartElapsedMs, nextEndElapsedMs, currentElapsedMs);
+    if (overlappingTask) {
+      return `Warning: ${task.name} would overlap ${overlappingTask.name}.`;
+    }
+
+    return "";
+  }
+
+  function findOverlappingTask(taskId, startElapsedMs, endElapsedMs, currentElapsedMs) {
+    return session.tasks.find((task) => {
+      if (task.id === taskId) {
+        return false;
+      }
+
+      const otherStartElapsedMs = normMs(task.startElapsedMs);
+      const otherEndElapsedMs = taskEndMs(task, currentElapsedMs);
+      return startElapsedMs < otherEndElapsedMs && endElapsedMs > otherStartElapsedMs;
+    }) || null;
+  }
+
+  function applyTaskBoundaryChange(task, boundary, nextElapsedMs, nextUnixMs) {
+    const nextIso = new Date(nextUnixMs).toISOString();
+    const safeElapsedMs = Math.max(0, Math.round(nextElapsedMs));
+
+    if (boundary === "start") {
+      task.startElapsedMs = safeElapsedMs;
+      task.createdAt = nextIso;
+    } else {
+      task.endElapsedMs = safeElapsedMs;
+      task.closedAt = nextIso;
+    }
+
+    syncTaskBoundaryEvents(task);
+    sortTasksChronologically();
+    sortEventsChronologically();
+  }
+
+  function syncTaskBoundaryEvents(task) {
+    const startEvent = session.events.find((eventItem) => eventItem.type === "task_start" && eventItem.taskId === task.id);
+    if (startEvent) {
+      startEvent.elapsedMs = normMs(task.startElapsedMs);
+      startEvent.createdAt = task.createdAt;
+      startEvent.taskName = task.name;
+      startEvent.label = eventLabel("task_start", { taskName: task.name });
+      startEvent.period = exportPeriodLabel(task.period);
+    }
+
+    const endEvent = session.events.find((eventItem) => eventItem.type === "task_end" && eventItem.taskId === task.id);
+    if (endEvent && task.endElapsedMs !== null && task.closedAt) {
+      endEvent.elapsedMs = normMs(task.endElapsedMs);
+      endEvent.createdAt = task.closedAt;
+      endEvent.taskName = task.name;
+      endEvent.label = eventLabel("task_end", { taskName: task.name });
+      endEvent.period = exportPeriodLabel(task.period);
+    }
+  }
+
+  function syncTaskEventNames(task) {
+    session.events.forEach((eventItem) => {
+      if (eventItem.taskId !== task.id) {
+        return;
+      }
+
+      eventItem.taskName = task.name;
+      if (eventItem.type === "task_start") {
+        eventItem.label = eventLabel("task_start", { taskName: task.name });
+      }
+      if (eventItem.type === "task_end") {
+        eventItem.label = eventLabel("task_end", { taskName: task.name });
+      }
+    });
+  }
+
+  function sortTasksChronologically() {
+    session.tasks.sort((left, right) => {
+      const startDiff = normMs(left.startElapsedMs) - normMs(right.startElapsedMs);
+      if (startDiff) {
+        return startDiff;
+      }
+
+      const endDiff =
+        (left.endElapsedMs == null ? Number.MAX_SAFE_INTEGER : normMs(left.endElapsedMs)) -
+        (right.endElapsedMs == null ? Number.MAX_SAFE_INTEGER : normMs(right.endElapsedMs));
+      if (endDiff) {
+        return endDiff;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  }
+
+  function sortEventsChronologically() {
+    session.events = session.events
+      .slice()
+      .sort((left, right) => {
+        const elapsedDiff = normMs(left.elapsedMs) - normMs(right.elapsedMs);
+        if (elapsedDiff) {
+          return elapsedDiff;
+        }
+
+        const createdDiff =
+          (toUnixMs(left.createdAt) === "" ? Number.MAX_SAFE_INTEGER : toUnixMs(left.createdAt)) -
+          (toUnixMs(right.createdAt) === "" ? Number.MAX_SAFE_INTEGER : toUnixMs(right.createdAt));
+        if (createdDiff) {
+          return createdDiff;
+        }
+
+        const typeDiff = (EVENT_SORT_ORDER[left.type] ?? 99) - (EVENT_SORT_ORDER[right.type] ?? 99);
+        if (typeDiff) {
+          return typeDiff;
+        }
+
+        return left.id.localeCompare(right.id);
+      })
+      .map((eventItem, index) => ({ ...eventItem, index: index + 1 }));
+  }
+
   function toggleLogDrawer() {
     const opening = el.logContent.hidden;
     el.logContent.hidden = !opening;
@@ -471,6 +1215,7 @@
     }
 
     session = createSession();
+    clearReviewSourceCache();
     selectedTaskId = null;
     selectionCleared = false;
     pendingPlayAfterNaming = false;
@@ -497,6 +1242,7 @@
 
   function startNewActivity() {
     session = createSession();
+    clearReviewSourceCache();
     selectedTaskId = null;
     selectionCleared = false;
     pendingPlayAfterNaming = true;
@@ -828,6 +1574,15 @@
     announce(message);
   }
 
+  function clearReviewSourceCache() {
+    try {
+      localStorage.removeItem(REVIEW_SOURCE_KEY);
+      reviewOverlaySession = null;
+    } catch (error) {
+      console.error("Unable to clear review source cache", error);
+    }
+  }
+
   function loadSession() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -835,6 +1590,30 @@
     } catch (error) {
       console.error("Unable to load session", error);
       return createSession();
+    }
+  }
+
+  function loadReviewSourceSession() {
+    try {
+      const raw = localStorage.getItem(REVIEW_SOURCE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      const candidate =
+        parsed && typeof parsed === "object" && parsed.session && typeof parsed.session === "object"
+          ? parsed.session
+          : parsed;
+
+      if (!candidate || typeof candidate !== "object" || !Array.isArray(candidate.tasks) || !candidate.tasks.length) {
+        return null;
+      }
+
+      return normalizeSession(candidate);
+    } catch (error) {
+      console.error("Unable to load review source overlay", error);
+      return null;
     }
   }
 
@@ -854,6 +1633,25 @@
       finishedAt: null,
       tasks: [],
       events: [],
+    };
+  }
+
+  function createTimePickerState() {
+    return {
+      open: false,
+      boundary: "start",
+      taskId: null,
+      anchorUnixMs: 0,
+      hour: 0,
+      minute: 0,
+      second: 0,
+      syncScroll: false,
+      scrollTimers: {
+        hour: null,
+        minute: null,
+        second: null,
+      },
+      restoreFocusId: "",
     };
   }
 
@@ -1095,8 +1893,10 @@
   }
 
   function getViewSnapshot() {
-    const elapsedMs = getCurrentElapsedMs();
-    const tasks = session.tasks.map((task) => toViewTask(task, elapsedMs));
+    const now = new Date();
+    const elapsedMs = getCurrentElapsedMs(now);
+    const overlayTasks = getOverlayTasksForSession();
+    const tasks = session.tasks.map((task) => applyOverlayToViewTask(toViewTask(task, elapsedMs), overlayTasks.get(task.id)));
     const activeTask = tasks.find((task) => task.id === session.activeTaskId) || null;
     const activeBip = activeTask && session.activeBipId
       ? activeTask.bips.find((bip) => bip.id === session.activeBipId) || null
@@ -1106,6 +1906,7 @@
     const ruckCount = tasks.reduce((sum, task) => sum + task.rucks.length, 0);
 
     return {
+      nowMs: now.getTime(),
       elapsedMs,
       clockState: session.clockState,
       activityLabel: labelActivity(session.activityName),
@@ -1131,6 +1932,55 @@
         nextTaskName: getNextTaskName(),
       }),
     };
+  }
+
+  function getOverlayTasksForSession() {
+    if (!reviewOverlaySession || reviewOverlaySession.sessionId !== session.sessionId) {
+      return new Map();
+    }
+
+    return new Map(reviewOverlaySession.tasks.map((task) => [task.id, task]));
+  }
+
+  function applyOverlayToViewTask(task, overlayTask) {
+    if (!overlayTask) {
+      return task;
+    }
+
+    const keepLiveEnd = task.isActive;
+    const nextStartElapsedMs =
+      isTaskStartAlignedToFirstBip(overlayTask) && task.bips.length
+        ? normMs(task.bips[0].startElapsedMs)
+        : task.startElapsedMs;
+    const nextEffectiveEndElapsedMs =
+      keepLiveEnd
+        ? task.effectiveEndElapsedMs
+        : isTaskEndAlignedToLastBip(overlayTask) && task.bips.length
+        ? Math.max(nextStartElapsedMs, normMs(task.bips[task.bips.length - 1].effectiveEndElapsedMs))
+        : Math.max(nextStartElapsedMs, task.effectiveEndElapsedMs);
+
+    return {
+      ...task,
+      name: typeof overlayTask.name === "string" && overlayTask.name ? overlayTask.name : task.name,
+      period: typeof overlayTask.period === "string" && overlayTask.period ? overlayTask.period : task.period,
+      startElapsedMs: nextStartElapsedMs,
+      effectiveEndElapsedMs: nextEffectiveEndElapsedMs,
+      durationMs: Math.max(0, nextEffectiveEndElapsedMs - nextStartElapsedMs),
+    };
+  }
+
+  function isTaskStartAlignedToFirstBip(task) {
+    return Boolean(task?.bips?.length) && normMs(task.startElapsedMs) === normMs(task.bips[0].startElapsedMs);
+  }
+
+  function isTaskEndAlignedToLastBip(task) {
+    if (!task?.bips?.length) {
+      return false;
+    }
+    const lastBip = task.bips[task.bips.length - 1];
+    const taskEndElapsedMs = task.endElapsedMs == null ? normMs(lastBip.endElapsedMs) : normMs(task.endElapsedMs);
+    const lastBipEndElapsedMs = lastBip.endElapsedMs == null ? taskEndElapsedMs : normMs(lastBip.endElapsedMs);
+    return taskEndElapsedMs === lastBipEndElapsedMs;
   }
 
   function normalizeSelectedTask(tasks, activeTask) {
@@ -1181,6 +2031,7 @@
     renderEditors(snapshot);
     renderTimeline(snapshot);
     renderEvents(snapshot);
+    renderTimePickerModal();
     renderSaveState();
     syncButtons(snapshot);
   }
@@ -1195,28 +2046,40 @@
     el.statePill.classList.toggle("state-pill--finished", snapshot.isFinished);
 
     el.activityBadge.textContent = snapshot.activityLabel;
-    el.periodBadge.textContent = snapshot.periodLabel;
+    if (el.periodBadge) {
+      el.periodBadge.textContent = snapshot.periodLabel;
+    }
     el.taskBadge.textContent = snapshot.activeTask ? snapshot.activeTask.name : "No active task";
-    el.bipBadge.textContent = snapshot.activeBip ? snapshot.activeBip.label : "No active BIP";
+    el.bipBadge.textContent = snapshot.activeBip
+      ? snapshot.activeBip.label
+      : snapshot.activeTask
+        ? "Task still live"
+        : "No active BIP";
     el.taskBadge.closest(".badge")?.classList.toggle("badge--live", Boolean(snapshot.activeTask));
     el.bipBadge.closest(".badge")?.classList.toggle("badge--live", Boolean(snapshot.activeBip));
     el.liveStatus.textContent = snapshot.statusMessage;
   }
 
   function renderEditors(snapshot = getViewSnapshot()) {
-    syncInput(el.periodInput, session.currentPeriod);
     el.taskCount.textContent = String(snapshot.tasks.length);
     el.bipCount.textContent = String(snapshot.bipCount);
     el.ruckCount.textContent = String(snapshot.ruckCount);
     el.eventCount.textContent = String(snapshot.events.length);
     el.logToggleCount.textContent = String(snapshot.events.length);
-    el.periodInput.disabled = snapshot.isFinished;
+    if (el.periodInput) {
+      syncInput(el.periodInput, session.currentPeriod);
+      el.periodInput.disabled = snapshot.isFinished;
+    }
     renderFinishButton(snapshot);
 
     const selectedTask = snapshot.selectedTask;
     if (!selectedTask) {
       el.selectedTaskPanel.hidden = true;
       syncInput(el.selectedTaskNameInput, "");
+      el.selectedTaskStartTime.textContent = "00:00:00";
+      el.selectedTaskEndTime.textContent = "00:00:00";
+      el.selectedTaskStartBtn.disabled = true;
+      el.selectedTaskEndBtn.disabled = true;
       return;
     }
 
@@ -1224,24 +2087,18 @@
     el.selectedTaskPanel.dataset.state = selectedTask.isActive ? "active" : "idle";
     el.selectedTaskTitle.textContent = selectedTask.name;
     el.selectedTaskState.textContent = selectedTask.isActive ? "Live" : "Selected";
-    el.selectedTaskMeta.textContent = `${selectedTask.period} · ${fmtClock(selectedTask.durationMs)}`;
+    el.selectedTaskMeta.textContent = `${selectedTask.period} · ${selectedTask.bips.length} BIPs · ${selectedTask.rucks.length} rucks`;
     syncInput(el.selectedTaskNameInput, selectedTask.name);
+    el.selectedTaskStartTime.textContent = fmtMadridTime(getTaskStartUnixMs(selectedTask));
+    el.selectedTaskEndTime.textContent = fmtMadridTime(
+      selectedTask.isActive ? snapshot.nowMs : getTaskEndUnixMs(selectedTask, new Date(snapshot.nowMs).toISOString())
+    );
     el.selectedTaskNameInput.disabled = snapshot.isFinished;
-
-    if (selectedTask.isActive) {
-      el.selectedTaskActionBtn.textContent = "Stop selected";
-      el.selectedTaskActionBtn.disabled = snapshot.isFinished;
-      return;
-    }
-
-    if (snapshot.activeTask) {
-      el.selectedTaskActionBtn.textContent = "Live task running";
-      el.selectedTaskActionBtn.disabled = true;
-      return;
-    }
-
-    el.selectedTaskActionBtn.textContent = "Start selected";
-    el.selectedTaskActionBtn.disabled = snapshot.isFinished || snapshot.clockState !== "running";
+    el.selectedTaskStartBtn.disabled = snapshot.isFinished;
+    el.selectedTaskEndBtn.disabled = snapshot.isFinished || selectedTask.isActive;
+    el.selectedTaskStartBtn.title = "Edit start time";
+    el.selectedTaskEndBtn.title = selectedTask.isActive ? "End time rolls while the task is live." : "Edit end time";
+    el.deleteTaskBtn.disabled = snapshot.isFinished;
   }
 
   function renderFinishButton(snapshot = getViewSnapshot()) {
@@ -1389,8 +2246,10 @@
     const shouldRun = session.clockState === "running";
     if (shouldRun && !tickTimer) {
       tickTimer = window.setInterval(() => {
-        renderClock();
-        renderTimeline();
+        const snapshot = getViewSnapshot();
+        renderClock(snapshot);
+        renderEditors(snapshot);
+        renderTimeline(snapshot);
       }, CLOCK_TICK_MS);
       return;
     }
@@ -1566,7 +2425,7 @@
     }
 
     if (activeTask) {
-      return `${activeTask.name} is active. Use BIP when the ball is in play.`;
+      return `${activeTask.name} is still live. Start the next BIP when the ball is back in play.`;
     }
 
     return `Press T+ to start ${nextTaskName}.`;
@@ -1613,6 +2472,16 @@
           minute: "2-digit",
           second: "2-digit",
         }).format(date);
+  }
+
+  function fmtMadridTime(value) {
+    const unixMs = typeof value === "number" ? value : Date.parse(value);
+    return Number.isFinite(unixMs) ? MADRID_TIME_FORMATTER.format(new Date(unixMs)) : "--:--:--";
+  }
+
+  function fmtMadridDate(value) {
+    const unixMs = typeof value === "number" ? value : Date.parse(value);
+    return Number.isFinite(unixMs) ? MADRID_DATE_LABEL_FORMATTER.format(new Date(unixMs)) : "";
   }
 
   function buildFilenameBase(activityName, isoDate) {
