@@ -667,7 +667,7 @@ button {
 
 .selected-task-panel__actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 6px;
 }
 

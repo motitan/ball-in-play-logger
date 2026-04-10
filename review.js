@@ -263,14 +263,17 @@
       .map((task) => toReviewTask(task, elapsedMs))
       .sort((left, right) => left.startElapsedMs - right.startElapsedMs);
     const hasTasks = tasks.length > 0;
-    const activeWindowStartMs = hasTasks ? tasks[0].startElapsedMs : 0;
-    const activeWindowEndMs = hasTasks ? Math.max(...tasks.map((task) => task.effectiveEndElapsedMs)) : 0;
-    const activeWindowMs = hasTasks ? Math.max(0, activeWindowEndMs - activeWindowStartMs) : 0;
+    const tasksWithBips = tasks.filter((task) => task.bipCount > 0);
+    const hasTasksWithBips = tasksWithBips.length > 0;
+    const activeWindowStartMs = hasTasksWithBips ? tasksWithBips[0].startElapsedMs : 0;
+    const activeWindowEndMs = hasTasksWithBips ? Math.max(...tasksWithBips.map((task) => task.effectiveEndElapsedMs)) : 0;
+    const activeWindowMs = hasTasksWithBips ? Math.max(0, activeWindowEndMs - activeWindowStartMs) : 0;
     const taskWindowEndMs =
       hasTasks && session.clockState === "running" && !tasks.some((task) => task.isActive)
         ? Math.max(activeWindowEndMs, elapsedMs)
-        : activeWindowEndMs;
-    const taskWindowMs = hasTasks ? Math.max(0, taskWindowEndMs - activeWindowStartMs) : 0;
+        : hasTasks ? Math.max(...tasks.map((task) => task.effectiveEndElapsedMs)) : 0;
+    const taskWindowStartMs = hasTasks ? tasks[0].startElapsedMs : 0;
+    const taskWindowMs = hasTasks ? Math.max(0, taskWindowEndMs - taskWindowStartMs) : 0;
     const bipCoverage = summarizeCoverage(
       tasks.flatMap((task) => task.bips.map((bip) => ({ startMs: bip.startElapsedMs, endMs: bip.effectiveEndElapsedMs })))
     );
@@ -278,7 +281,7 @@
       tasks.map((task) => ({ startMs: task.startElapsedMs, endMs: task.effectiveEndElapsedMs }))
     );
     const bipWorkMs = Math.min(activeWindowMs, bipCoverage.coveredMs);
-    const taskWorkMs = Math.min(activeWindowMs, taskCoverage.coveredMs);
+    const taskWorkMs = Math.min(taskWindowMs, taskCoverage.coveredMs);
     const totalRucks = tasks.reduce((sum, task) => sum + task.ruckCount, 0);
     const totalBips = tasks.reduce((sum, task) => sum + task.bipCount, 0);
 
@@ -411,9 +414,9 @@
       ratioLabel: "BIP %",
       workMeta: "Total ball in play",
       restMeta: "Dead ball / recovery",
-      ratioMeta: "BIP to active window",
-      note: "BIP view counts dead-ball time inside drills as rest so live ball exposure is easy to read.",
-      windowLabel: "active window",
+      ratioMeta: "BIP to BIP task window",
+      note: "BIP view counts dead-ball time inside drills as rest and only uses tasks with BIPs to set the denominator.",
+      windowLabel: "BIP task window",
       ratioColor: "rgba(136, 188, 108, 0.95)",
     };
   }

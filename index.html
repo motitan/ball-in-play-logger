@@ -10,10 +10,10 @@
     <meta name="apple-mobile-web-app-title" content="BIP Logger" />
     <meta name="application-name" content="BIP Logger" />
     <title>BIP Logger</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260408-1" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260410-1" />
     <link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/app-icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260408-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260410-1" />
   </head>
   <body class="logger-page">
     <div class="app-shell app-shell--logger">
@@ -153,6 +153,9 @@
 
             <div class="selected-task-panel__actions">
               <span class="field-block__hint">Delete removes this task together with its BIPs, rucks, and task log rows.</span>
+              <button id="selectedTaskActionBtn" class="aux-btn aux-btn--primary" type="button" title="Restart selected task" aria-label="Restart selected task">
+                Restart task
+              </button>
               <button id="deleteTaskBtn" class="aux-btn aux-btn--danger" type="button" title="Delete selected task" aria-label="Delete selected task">
                 <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
                   <path d="M4 5h12M8 3h4M6 5l1 11h6l1-11M9 8v5m2-5v5" />
@@ -318,7 +321,7 @@
     </div>
 
     <div id="srStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./pwa.js?v=20260408-1"></script>
-    <script src="./app.js?v=20260407-19"></script>
+    <script src="./pwa.js?v=20260410-1"></script>
+    <script src="./app.js?v=20260410-1"></script>
   </body>
 </html>

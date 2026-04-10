@@ -84,6 +84,7 @@
     selectedTaskState: document.getElementById("selectedTaskState"),
     selectedTaskMeta: document.getElementById("selectedTaskMeta"),
     selectedTaskNameInput: document.getElementById("selectedTaskNameInput"),
+    selectedTaskActionBtn: document.getElementById("selectedTaskActionBtn"),
     selectedTaskStartBtn: document.getElementById("selectedTaskStartBtn"),
     selectedTaskStartTime: document.getElementById("selectedTaskStartTime"),
     selectedTaskEndBtn: document.getElementById("selectedTaskEndBtn"),
@@ -154,6 +155,7 @@
     }
     el.selectedTaskNameInput.addEventListener("input", handleSelectedTaskRename);
     el.selectedTaskNameInput.addEventListener("blur", commitSelectedTaskRename);
+    el.selectedTaskActionBtn.addEventListener("click", handleSelectedTaskAction);
     el.selectedTaskStartBtn.addEventListener("click", () => handleSelectedTaskBoundaryEdit("start"));
     el.selectedTaskEndBtn.addEventListener("click", () => handleSelectedTaskBoundaryEdit("end"));
     el.deleteTaskBtn.addEventListener("click", handleDeleteTaskIntent);
@@ -631,17 +633,13 @@
       return;
     }
 
-    if (session.activeTaskId) {
-      announce("Stop the live task before starting another.");
+    const restartTaskError = getRestartTaskUnavailableReason(selectedTask);
+    if (restartTaskError) {
+      announce(restartTaskError);
       return;
     }
 
-    if (session.clockState !== "running") {
-      announce("Start the clock before starting a task.");
-      return;
-    }
-
-    startTask(selectedTask.name);
+    restartTask(selectedTask);
   }
 
   function startTask(name = "") {
@@ -693,6 +691,19 @@
     });
     setSelectedTask(task.id);
     persistSession(`Task ended: ${task.name}.`);
+    renderAll();
+  }
+
+  function restartTask(task) {
+    task.endElapsedMs = null;
+    task.closedAt = null;
+    session.activeTaskId = task.id;
+    session.activeBipId = null;
+    session.events = session.events
+      .filter((eventItem) => !(eventItem.type === "task_end" && eventItem.taskId === task.id))
+      .map((eventItem, index) => ({ ...eventItem, index: index + 1 }));
+    setSelectedTask(task.id);
+    persistSession(`Task restarted: ${task.name}.`);
     renderAll();
   }
 
@@ -1904,6 +1915,7 @@
     const selectedTask = normalizeSelectedTask(tasks, activeTask);
     const bipCount = tasks.reduce((sum, task) => sum + task.bips.length, 0);
     const ruckCount = tasks.reduce((sum, task) => sum + task.rucks.length, 0);
+    const timelineOriginMs = getTimelineOriginMs(tasks);
 
     return {
       nowMs: now.getTime(),
@@ -1922,7 +1934,8 @@
       selectedTask,
       bipCount,
       ruckCount,
-      totalDurationMs: getTotalDuration(tasks, session.events, elapsedMs),
+      timelineOriginMs,
+      totalDurationMs: getTotalDuration(tasks, session.events, elapsedMs, timelineOriginMs),
       statusMessage: buildStatus({
         hasNamedActivity: hasValue(session.activityName),
         hasNamedPeriod: hasValue(session.currentPeriod),
@@ -2076,6 +2089,9 @@
     if (!selectedTask) {
       el.selectedTaskPanel.hidden = true;
       syncInput(el.selectedTaskNameInput, "");
+      el.selectedTaskActionBtn.textContent = "Restart task";
+      el.selectedTaskActionBtn.disabled = true;
+      el.selectedTaskActionBtn.title = "Select a task first.";
       el.selectedTaskStartTime.textContent = "00:00:00";
       el.selectedTaskEndTime.textContent = "00:00:00";
       el.selectedTaskStartBtn.disabled = true;
@@ -2093,7 +2109,24 @@
     el.selectedTaskEndTime.textContent = fmtMadridTime(
       selectedTask.isActive ? snapshot.nowMs : getTaskEndUnixMs(selectedTask, new Date(snapshot.nowMs).toISOString())
     );
-    el.selectedTaskNameInput.disabled = snapshot.isFinished;
+    const activeTask = snapshot.activeTask;
+    const restartTaskError = getRestartTaskUnavailableReason(getSelectedTaskFromSession());
+    const canStopSelectedTask = selectedTask.isActive;
+    const canRestartSelectedTask = !restartTaskError;
+    const selectedTaskActionLabel = canStopSelectedTask ? "Stop task" : "Restart task";
+    let selectedTaskActionTitle = canStopSelectedTask
+      ? `Stop ${selectedTask.name}.`
+      : `Restart ${selectedTask.name}.`;
+
+    if (!canStopSelectedTask && !canRestartSelectedTask) {
+      selectedTaskActionTitle = restartTaskError;
+    }
+
+    el.selectedTaskNameInput.disabled = false;
+    el.selectedTaskActionBtn.textContent = selectedTaskActionLabel;
+    el.selectedTaskActionBtn.disabled = !(canStopSelectedTask || canRestartSelectedTask);
+    el.selectedTaskActionBtn.title = selectedTaskActionTitle;
+    el.selectedTaskActionBtn.setAttribute("aria-label", selectedTaskActionLabel);
     el.selectedTaskStartBtn.disabled = snapshot.isFinished;
     el.selectedTaskEndBtn.disabled = snapshot.isFinished || selectedTask.isActive;
     el.selectedTaskStartBtn.title = "Edit start time";
@@ -2159,7 +2192,7 @@
       <button
         class="${classes}"
         type="button"
-        style="${intervalStyle(task.startElapsedMs, task.effectiveEndElapsedMs, snapshot.totalDurationMs)}"
+        style="${intervalStyle(task.startElapsedMs, task.effectiveEndElapsedMs, snapshot.totalDurationMs, snapshot.timelineOriginMs)}"
         data-task-id="${esc(task.id)}"
         aria-label="${esc(task.name)}"
       >
@@ -2173,7 +2206,7 @@
       <button
         class="bip-span${bip.isActive ? " bip-span--active" : ""}"
         type="button"
-        style="${intervalStyle(bip.startElapsedMs, bip.effectiveEndElapsedMs, snapshot.totalDurationMs)}"
+        style="${intervalStyle(bip.startElapsedMs, bip.effectiveEndElapsedMs, snapshot.totalDurationMs, snapshot.timelineOriginMs)}"
         data-task-id="${esc(task.id)}"
         aria-label="${esc(`${bip.label} inside ${task.name}`)}"
       >
@@ -2187,9 +2220,9 @@
       <button
         class="ruck-marker"
         type="button"
-        style="left:${toPct(ruck.elapsedMs, snapshot.totalDurationMs)}%"
+        style="left:${toPct(Math.max(0, ruck.elapsedMs - snapshot.timelineOriginMs), snapshot.totalDurationMs)}%"
         data-task-id="${esc(task.id)}"
-        aria-label="${esc(`Ruck in ${task.name} at ${fmtClock(ruck.elapsedMs)}`)}"
+        aria-label="${esc(`Ruck in ${task.name} at ${fmtClock(Math.max(0, ruck.elapsedMs - snapshot.timelineOriginMs))}`)}"
       ></button>
     `;
   }
@@ -2272,6 +2305,33 @@
     return findTask(session.tasks, selectedTaskId);
   }
 
+  function getRestartTaskUnavailableReason(task) {
+    if (!task) {
+      return "Select a task first.";
+    }
+
+    if (session.isFinished) {
+      return "Finished activities cannot restart tasks.";
+    }
+
+    if (session.activeTaskId) {
+      const activeTask = getActiveTask();
+      return activeTask
+        ? `Stop ${activeTask.name} before restarting another task.`
+        : "Stop the live task before restarting another task.";
+    }
+
+    if (session.clockState !== "running") {
+      return "Press Play to restart the clock before restarting the task.";
+    }
+
+    if (session.tasks.at(-1)?.id !== task.id) {
+      return "Only the most recent task can be restarted.";
+    }
+
+    return "";
+  }
+
   function findTask(tasks, taskId) {
     if (!taskId) {
       return null;
@@ -2312,8 +2372,19 @@
     return bip.endElapsedMs === null ? currentElapsedMs : bip.endElapsedMs;
   }
 
-  function getTotalDuration(tasks, events, elapsedMs) {
-    let maxValue = Math.max(1, elapsedMs);
+  function getTimelineOriginMs(tasks) {
+    if (!tasks.length) {
+      return 0;
+    }
+
+    return tasks.reduce(
+      (minValue, task) => Math.min(minValue, normMs(task.startElapsedMs)),
+      normMs(tasks[0].startElapsedMs)
+    );
+  }
+
+  function getTotalDuration(tasks, events, elapsedMs, originMs = 0) {
+    let maxValue = Math.max(normMs(originMs) + 1, elapsedMs);
 
     tasks.forEach((task) => {
       maxValue = Math.max(maxValue, task.effectiveEndElapsedMs, task.startElapsedMs);
@@ -2329,7 +2400,7 @@
       maxValue = Math.max(maxValue, eventItem.elapsedMs);
     });
 
-    return maxValue;
+    return Math.max(1, maxValue - normMs(originMs));
   }
 
   function getNextTaskName() {
@@ -2441,9 +2512,10 @@
     el.srStatus.textContent = message;
   }
 
-  function intervalStyle(startElapsedMs, endElapsedMs, totalDurationMs) {
-    const safeStart = Math.max(0, startElapsedMs);
-    const safeEnd = Math.max(safeStart, endElapsedMs);
+  function intervalStyle(startElapsedMs, endElapsedMs, totalDurationMs, originMs = 0) {
+    const safeOrigin = Math.max(0, normMs(originMs));
+    const safeStart = Math.max(0, startElapsedMs - safeOrigin);
+    const safeEnd = Math.max(safeStart, endElapsedMs - safeOrigin);
     return `left:${toPct(safeStart, totalDurationMs)}%;width:${Math.max(toPct(safeEnd - safeStart, totalDurationMs), 1.4)}%`;
   }
 
