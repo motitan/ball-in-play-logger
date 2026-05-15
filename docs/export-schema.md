@@ -129,4 +129,5 @@ The JSON export uses:
 
 - CSV and JSON are intentionally aligned to the same flat schema.
 - Editor imports the exported CSV, JSON, or ZIP and rebuilds task/BIP/ruck structure from these rows.
+- `*_unix_ms` fields remain Unix millisecond timestamps. If Logger users manually edit wall-clock times, the selected Settings time zone decides how those timestamps are resolved before export.
 - If this schema changes, update `README.md`, `CONTRIBUTING.md`, and this file together.

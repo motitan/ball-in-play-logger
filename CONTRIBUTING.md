@@ -9,11 +9,16 @@ Thanks for contributing to Ball In Play Logger.
   - `Logger`
   - `Review`
   - `Editor`
+  - `Settings`
 - Core files:
   - `index.html`
   - `review.html`
   - `editor.html`
+  - `settings.html`
   - `styles.css`
+  - `preferences.js`
+  - `theme.js`
+  - `settings.js`
   - `app.js`
   - `review.js`
   - `editor.js`
@@ -46,7 +51,7 @@ node --check editor.js
 
 - Keep the app static and dependency-light unless there is a strong reason not to.
 - Prefer preserving export schema compatibility once a column is shipped.
-- Keep Logger for live capture, Review for read-only session analysis, and Editor for imported-file editing.
+- Keep Logger for live capture, Review for read-only session analysis, Editor for imported-file editing, and Settings for browser-local preferences.
 - When changing exports, update `docs/export-schema.md` and `README.md` in the same change.
 
 ## Pull Requests

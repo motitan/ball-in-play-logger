@@ -1,15 +1,19 @@
-const CACHE_NAME = "bip-logger-shell-v20260410-1";
+const CACHE_NAME = "bip-logger-shell-v20260514-2";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./review.html",
   "./editor.html",
-  "./manifest.webmanifest?v=20260410-1",
-  "./pwa.js?v=20260410-1",
-  "./styles.css?v=20260410-1",
-  "./app.js?v=20260410-1",
-  "./review.js?v=20260410-1",
-  "./editor.js?v=20260410-1",
+  "./settings.html",
+  "./manifest.webmanifest?v=20260514-2",
+  "./preferences.js?v=20260514-2",
+  "./theme.js?v=20260514-2",
+  "./settings.js?v=20260514-2",
+  "./pwa.js?v=20260514-2",
+  "./styles.css?v=20260514-2",
+  "./app.js?v=20260514-2",
+  "./review.js?v=20260514-2",
+  "./editor.js?v=20260514-2",
   "./icons/app-icon.svg",
   "./icons/app-icon-maskable.svg"
 ];

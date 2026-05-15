@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
   const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
+  const PREFERENCES_STORAGE_KEY = window.BIPPreferences?.STORAGE_KEY || "ball-in-play-logger-preferences-v1";
   const DEFAULT_PERIOD = "";
   const DEFAULT_ACTIVITY = "Activity";
   const PROMPT_ACTIVITY = "Start activity";
@@ -8,29 +9,6 @@
   const EXPORT_PERIOD = "Untitled Period";
   const CLOCK_TICK_MS = 250;
   const RUCK_WINDOW_MS = 1500;
-  const MADRID_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Madrid",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const MADRID_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Madrid",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const MADRID_DATE_LABEL_FORMATTER = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Madrid",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
   const MAX_ACTIVITY = 64;
   const MAX_PERIOD = 48;
@@ -89,6 +67,7 @@
     selectedTaskStartTime: document.getElementById("selectedTaskStartTime"),
     selectedTaskEndBtn: document.getElementById("selectedTaskEndBtn"),
     selectedTaskEndTime: document.getElementById("selectedTaskEndTime"),
+    selectedTaskDurationTime: document.getElementById("selectedTaskDurationTime"),
     deleteTaskBtn: document.getElementById("deleteTaskBtn"),
     exportCsvBtn: document.getElementById("exportCsvBtn"),
     exportJsonBtn: document.getElementById("exportJsonBtn"),
@@ -189,7 +168,7 @@
   }
 
   function handleExternalStorageSync(event) {
-    if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
+    if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY, PREFERENCES_STORAGE_KEY].includes(event.key)) {
       return;
     }
 
@@ -264,7 +243,7 @@
 
   function openTimePickerModal(task, boundary) {
     const anchorUnixMs = getTaskBoundaryAnchorUnixMs(task, boundary);
-    const parts = getMadridDateParts(anchorUnixMs);
+    const parts = getTimeZoneDateParts(anchorUnixMs);
     if (!parts) {
       window.alert("Unable to open the time picker for this task.");
       return;
@@ -315,14 +294,14 @@
       return;
     }
 
-    const targetUnixMs = resolveMadridClockUnixMs(
+    const targetUnixMs = resolveClockUnixMsInPreferredZone(
       timePickerState.anchorUnixMs,
       timePickerState.hour,
       timePickerState.minute,
       timePickerState.second
     );
     if (targetUnixMs === null) {
-      window.alert("Unable to resolve that Madrid time.");
+      window.alert("Unable to resolve that local time.");
       return;
     }
 
@@ -372,7 +351,7 @@
     el.timePickerModal.hidden = false;
     el.timePickerEyebrow.textContent = `Edit ${boundaryLabel.toLowerCase()} time`;
     el.timePickerTitle.textContent = `${task.name} ${boundaryLabel}`;
-    el.timePickerSubtitle.textContent = `${fmtMadridDate(timePickerState.anchorUnixMs)} · Madrid time`;
+    el.timePickerSubtitle.textContent = `${fmtPreferredZoneDate(timePickerState.anchorUnixMs)} · ${getPreferredTimeZoneLabel()}`;
     el.timePickerSaveBtn.textContent = `Save ${boundaryLabel.toLowerCase()} time`;
     el.timePickerHourList.innerHTML = buildTimeWheelOptions(24, timePickerState.hour, "hour");
     el.timePickerMinuteList.innerHTML = buildTimeWheelOptions(60, timePickerState.minute, "minute");
@@ -645,6 +624,9 @@
   function startTask(name = "") {
     const now = new Date();
     const elapsedMs = getCurrentElapsedMs(now);
+    if (!session.tasks.length) {
+      session.createdAt = now.toISOString();
+    }
     const task = {
       id: createId(),
       name: taskLabel(name, session.tasks.length + 1),
@@ -873,7 +855,7 @@
     return getTaskEndUnixMs(task, task.closedAt || task.createdAt);
   }
 
-  function resolveMadridClockUnixMs(anchorUnixMs, hour, minute, second) {
+  function resolveClockUnixMsInPreferredZone(anchorUnixMs, hour, minute, second) {
     if (
       !Number.isInteger(hour) ||
       !Number.isInteger(minute) ||
@@ -888,39 +870,95 @@
       return null;
     }
 
-    const anchorParts = getMadridDateParts(anchorUnixMs);
+    const timeZone = getPreferredTimeZone();
+    const anchorParts = getTimeZoneDateParts(anchorUnixMs, timeZone);
     if (!anchorParts) {
       return null;
     }
 
-    const baseUnixMs = Date.UTC(anchorParts.year, anchorParts.month - 1, anchorParts.day, hour, minute, second);
-    for (const offsetHours of [2, 1, 0]) {
-      const candidateUnixMs = baseUnixMs - offsetHours * 60 * 60 * 1000;
-      const candidateParts = getMadridDateParts(candidateUnixMs);
-      if (
+    const targetUtcMs = Date.UTC(anchorParts.year, anchorParts.month - 1, anchorParts.day, hour, minute, second);
+    const offsetGuesses = [
+      getTimeZoneOffsetMs(anchorUnixMs, timeZone),
+      getTimeZoneOffsetMs(anchorUnixMs - 12 * 60 * 60 * 1000, timeZone),
+      getTimeZoneOffsetMs(anchorUnixMs + 12 * 60 * 60 * 1000, timeZone),
+      0,
+    ].filter((value, index, values) => Number.isFinite(value) && values.indexOf(value) === index);
+
+    let bestCandidate = null;
+    const candidateSet = new Set();
+
+    offsetGuesses.forEach((offsetMs) => {
+      let candidateUnixMs = targetUtcMs - offsetMs;
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const nextOffsetMs = getTimeZoneOffsetMs(candidateUnixMs, timeZone);
+        const nextCandidateUnixMs = targetUtcMs - nextOffsetMs;
+        if (Math.abs(nextCandidateUnixMs - candidateUnixMs) < 1000) {
+          candidateUnixMs = nextCandidateUnixMs;
+          break;
+        }
+        candidateUnixMs = nextCandidateUnixMs;
+      }
+
+      [candidateUnixMs, candidateUnixMs - 60 * 60 * 1000, candidateUnixMs + 60 * 60 * 1000].forEach((value) => {
+        if (Number.isFinite(value)) {
+          candidateSet.add(Math.round(value));
+        }
+      });
+    });
+
+    candidateSet.forEach((candidateUnixMs) => {
+      const candidateParts = getTimeZoneDateParts(candidateUnixMs, timeZone);
+      const isExactMatch =
         candidateParts &&
         candidateParts.year === anchorParts.year &&
         candidateParts.month === anchorParts.month &&
         candidateParts.day === anchorParts.day &&
         candidateParts.hour === hour &&
         candidateParts.minute === minute &&
-        candidateParts.second === second
-      ) {
-        return candidateUnixMs;
-      }
-    }
+        candidateParts.second === second;
 
-    return null;
+      if (!isExactMatch) {
+        return;
+      }
+
+      if (
+        bestCandidate === null ||
+        Math.abs(candidateUnixMs - anchorUnixMs) < Math.abs(bestCandidate - anchorUnixMs)
+      ) {
+        bestCandidate = candidateUnixMs;
+      }
+    });
+
+    return bestCandidate;
   }
 
-  function getMadridDateParts(value) {
+  function getTimeZoneOffsetMs(unixMs, timeZone = getPreferredTimeZone()) {
+    const parts = getTimeZoneDateParts(unixMs, timeZone);
+    if (!parts) {
+      return 0;
+    }
+
+    return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - unixMs;
+  }
+
+  function getTimeZoneDateParts(value, timeZone = getPreferredTimeZone()) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
       return null;
     }
 
     const parts = Object.create(null);
-    MADRID_DATE_TIME_FORMATTER.formatToParts(date).forEach((part) => {
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(date).forEach((part) => {
       if (part.type !== "literal") {
         parts[part.type] = part.value;
       }
@@ -1828,7 +1866,7 @@
     const elapsedMs = getCurrentElapsedMs();
     return {
       sessionId: session.sessionId,
-      createdAt: session.createdAt,
+      createdAt: getActivityStartIso(session.tasks, session.createdAt),
       exportedAt: nowIso,
       activityName: exportActivityLabel(session.activityName),
       currentPeriod: exportPeriodLabel(session.currentPeriod),
@@ -1858,6 +1896,34 @@
       }),
       rucks: task.rucks.map((ruck) => ({ ...ruck })),
     };
+  }
+
+  function getActivityStartIso(tasks = session.tasks, fallbackIso = session.createdAt) {
+    const earliestTask = Array.isArray(tasks)
+      ? tasks.reduce((earliest, candidate) => {
+          if (!candidate) {
+            return earliest;
+          }
+          if (!earliest) {
+            return candidate;
+          }
+
+          const startDiff = normMs(candidate.startElapsedMs) - normMs(earliest.startElapsedMs);
+          if (startDiff !== 0) {
+            return startDiff < 0 ? candidate : earliest;
+          }
+
+          const candidateUnixMs = toUnixMs(candidate.createdAt);
+          const earliestUnixMs = toUnixMs(earliest.createdAt);
+          if (candidateUnixMs !== "" && earliestUnixMs !== "" && candidateUnixMs !== earliestUnixMs) {
+            return candidateUnixMs < earliestUnixMs ? candidate : earliest;
+          }
+
+          return candidate.id.localeCompare(earliest.id) < 0 ? candidate : earliest;
+        }, null)
+      : null;
+
+    return earliestTask?.createdAt || fallbackIso;
   }
 
   function getTaskStartUnixMs(task) {
@@ -2094,6 +2160,7 @@
       el.selectedTaskActionBtn.title = "Select a task first.";
       el.selectedTaskStartTime.textContent = "00:00:00";
       el.selectedTaskEndTime.textContent = "00:00:00";
+      el.selectedTaskDurationTime.textContent = "00:00:00";
       el.selectedTaskStartBtn.disabled = true;
       el.selectedTaskEndBtn.disabled = true;
       return;
@@ -2105,10 +2172,11 @@
     el.selectedTaskState.textContent = selectedTask.isActive ? "Live" : "Selected";
     el.selectedTaskMeta.textContent = `${selectedTask.period} · ${selectedTask.bips.length} BIPs · ${selectedTask.rucks.length} rucks`;
     syncInput(el.selectedTaskNameInput, selectedTask.name);
-    el.selectedTaskStartTime.textContent = fmtMadridTime(getTaskStartUnixMs(selectedTask));
-    el.selectedTaskEndTime.textContent = fmtMadridTime(
+    el.selectedTaskStartTime.textContent = fmtPreferredZoneTime(getTaskStartUnixMs(selectedTask));
+    el.selectedTaskEndTime.textContent = fmtPreferredZoneTime(
       selectedTask.isActive ? snapshot.nowMs : getTaskEndUnixMs(selectedTask, new Date(snapshot.nowMs).toISOString())
     );
+    el.selectedTaskDurationTime.textContent = fmtClock(selectedTask.durationMs);
     const activeTask = snapshot.activeTask;
     const restartTaskError = getRestartTaskUnavailableReason(getSelectedTaskFromSession());
     const canStopSelectedTask = selectedTask.isActive;
@@ -2540,20 +2608,44 @@
     return Number.isNaN(date.getTime())
       ? "--:--"
       : new Intl.DateTimeFormat(undefined, {
+          timeZone: getPreferredTimeZone(),
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
         }).format(date);
   }
 
-  function fmtMadridTime(value) {
+  function fmtPreferredZoneTime(value) {
     const unixMs = typeof value === "number" ? value : Date.parse(value);
-    return Number.isFinite(unixMs) ? MADRID_TIME_FORMATTER.format(new Date(unixMs)) : "--:--:--";
+    return Number.isFinite(unixMs)
+      ? new Intl.DateTimeFormat("en-GB", {
+          timeZone: getPreferredTimeZone(),
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }).format(new Date(unixMs))
+      : "--:--:--";
   }
 
-  function fmtMadridDate(value) {
+  function fmtPreferredZoneDate(value) {
     const unixMs = typeof value === "number" ? value : Date.parse(value);
-    return Number.isFinite(unixMs) ? MADRID_DATE_LABEL_FORMATTER.format(new Date(unixMs)) : "";
+    return Number.isFinite(unixMs)
+      ? new Intl.DateTimeFormat("en-GB", {
+          timeZone: getPreferredTimeZone(),
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }).format(new Date(unixMs))
+      : "";
+  }
+
+  function getPreferredTimeZone() {
+    return window.BIPPreferences?.getResolvedTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  }
+
+  function getPreferredTimeZoneLabel() {
+    return window.BIPPreferences?.getTimeZoneLabel?.() || getPreferredTimeZone();
   }
 
   function buildFilenameBase(activityName, isoDate) {

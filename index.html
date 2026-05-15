@@ -10,10 +10,23 @@
     <meta name="apple-mobile-web-app-title" content="BIP Logger" />
     <meta name="application-name" content="BIP Logger" />
     <title>BIP Logger</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260410-1" />
+    <script>
+      (() => {
+        try {
+          const raw = localStorage.getItem("ball-in-play-logger-preferences-v1");
+          const parsed = raw ? JSON.parse(raw) : null;
+          const legacyTheme = localStorage.getItem("ball-in-play-logger-theme-v1");
+          const theme = parsed?.theme === "light" || legacyTheme === "light" ? "light" : "dark";
+          document.documentElement.dataset.theme = theme;
+        } catch (error) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
+    <link rel="manifest" href="./manifest.webmanifest?v=20260514-2" />
     <link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/app-icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260410-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260514-2" />
   </head>
   <body class="logger-page">
     <div class="app-shell app-shell--logger">
@@ -29,6 +42,13 @@
           <a class="page-tab page-tab--active" href="./index.html" aria-current="page">Logger</a>
           <a class="page-tab" href="./review.html">Review</a>
           <a class="page-tab" href="./editor.html">Editor</a>
+          <a class="page-tab page-tab--nav-icon" href="./settings.html">
+            <svg class="page-tab__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.2" />
+              <path d="M12 2.8v2.1m0 14.2v2.1M21.2 12h-2.1M4.9 12H2.8m15.7-6.3-1.5 1.5M7 17l-1.5 1.5m0-12.8L7 7m10 10 1.5 1.5" />
+            </svg>
+            <span>Settings</span>
+          </a>
         </nav>
         <div class="top-bar__context">
           <span class="top-bar__label">Activity</span>
@@ -149,6 +169,10 @@
                 <span class="selected-task-time__label">End</span>
                 <strong id="selectedTaskEndTime" class="selected-task-time__value">00:00:00</strong>
               </button>
+              <div class="selected-task-time selected-task-time--static" aria-label="Selected task duration">
+                <span class="selected-task-time__label">Duration</span>
+                <strong id="selectedTaskDurationTime" class="selected-task-time__value">00:00:00</strong>
+              </div>
             </div>
 
             <div class="selected-task-panel__actions">
@@ -283,7 +307,7 @@
         <p id="timePickerEyebrow" class="activity-modal__eyebrow">Edit task time</p>
         <div class="time-picker-modal__head">
           <h2 id="timePickerTitle" class="time-picker-modal__title">Set time</h2>
-          <p id="timePickerSubtitle" class="time-picker-modal__subtitle">Madrid time</p>
+          <p id="timePickerSubtitle" class="time-picker-modal__subtitle">Selected time zone</p>
         </div>
         <p class="time-picker-modal__copy">Scroll or tap each wheel, then confirm the new task time.</p>
 
@@ -321,7 +345,9 @@
     </div>
 
     <div id="srStatus" class="sr-only" aria-live="polite"></div>
-    <script src="./pwa.js?v=20260410-1"></script>
-    <script src="./app.js?v=20260410-1"></script>
+    <script src="./preferences.js?v=20260514-2"></script>
+    <script src="./theme.js?v=20260514-2"></script>
+    <script src="./pwa.js?v=20260514-2"></script>
+    <script src="./app.js?v=20260514-2"></script>
   </body>
 </html>

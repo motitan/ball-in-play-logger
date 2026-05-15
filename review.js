@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
   const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
+  const PREFERENCES_STORAGE_KEY = window.BIPPreferences?.STORAGE_KEY || "ball-in-play-logger-preferences-v1";
   const DEFAULT_PERIOD = "";
   const DEFAULT_ACTIVITY = "Activity";
   const EXPORT_PERIOD = "Untitled Period";
@@ -101,7 +102,7 @@
     el.reviewModeBipBtn.addEventListener("click", () => setOverviewMetricMode("bip"));
 
     window.addEventListener("storage", (event) => {
-      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
+      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY, PREFERENCES_STORAGE_KEY].includes(event.key)) {
         return;
       }
       refreshSession();
@@ -286,7 +287,7 @@
     const totalBips = tasks.reduce((sum, task) => sum + task.bipCount, 0);
 
     return {
-      createdAt: session.createdAt,
+      createdAt: getActivityStartIso(session.tasks, session.createdAt),
       elapsedMs,
       clockState: session.clockState,
       isFinished: session.isFinished === true,
@@ -467,7 +468,7 @@
     const elapsedMs = getCurrentElapsedMs();
     return {
       sessionId: session.sessionId,
-      createdAt: session.createdAt,
+      createdAt: getActivityStartIso(session.tasks, session.createdAt),
       exportedAt: nowIso,
       activityName: exportActivityLabel(session.activityName),
       clockState: session.clockState,
@@ -658,6 +659,34 @@
 
   function bipEndMs(bip, currentElapsedMs) {
     return bip.endElapsedMs == null ? currentElapsedMs : bip.endElapsedMs;
+  }
+
+  function getActivityStartIso(tasks = session.tasks, fallbackIso = session.createdAt) {
+    const earliestTask = Array.isArray(tasks)
+      ? tasks.reduce((earliest, candidate) => {
+          if (!candidate) {
+            return earliest;
+          }
+          if (!earliest) {
+            return candidate;
+          }
+
+          const startDiff = normMs(candidate.startElapsedMs) - normMs(earliest.startElapsedMs);
+          if (startDiff !== 0) {
+            return startDiff < 0 ? candidate : earliest;
+          }
+
+          const candidateUnixMs = toUnixMs(candidate.createdAt);
+          const earliestUnixMs = toUnixMs(earliest.createdAt);
+          if (candidateUnixMs !== "" && earliestUnixMs !== "" && candidateUnixMs !== earliestUnixMs) {
+            return candidateUnixMs < earliestUnixMs ? candidate : earliest;
+          }
+
+          return candidate.id.localeCompare(earliest.id) < 0 ? candidate : earliest;
+        }, null)
+      : null;
+
+    return earliestTask?.createdAt || fallbackIso;
   }
 
   function getTaskStartUnixMs(task) {
@@ -1181,6 +1210,7 @@
       return "Unknown date";
     }
     return new Intl.DateTimeFormat(undefined, {
+      timeZone: getPreferredTimeZone(),
       weekday: "short",
       day: "2-digit",
       month: "2-digit",
@@ -1188,6 +1218,10 @@
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  }
+
+  function getPreferredTimeZone() {
+    return window.BIPPreferences?.getResolvedTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   }
 
   function announce(message) {

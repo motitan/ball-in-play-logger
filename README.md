@@ -43,6 +43,7 @@ Static rugby analysis app for logging live activity, reviewing the current sessi
 - nested BIP logging inside tasks
 - ruck logging (`R`)
 - finish activity flow with confirmation
+- settings page for theme and Logger time-zone preferences
 - ZIP export containing both CSV and JSON
 - current-session analytics view
 
@@ -65,6 +66,7 @@ Pages:
 - Logger: `http://localhost:8000/index.html`
 - Review: `http://localhost:8000/review.html`
 - Editor: `http://localhost:8000/editor.html`
+- Settings: `http://localhost:8000/settings.html`
 
 ## Validate Locally
 
@@ -79,7 +81,11 @@ node --check editor.js
 - `index.html`: Logger page
 - `review.html`: Review page
 - `editor.html`: Editor page
+- `settings.html`: Settings page for theme and time-zone preferences
 - `styles.css`: shared styling for all pages
+- `preferences.js`: shared local preference store
+- `theme.js`: shared theme application
+- `settings.js`: settings page behavior
 - `app.js`: live logger logic and export pipeline
 - `review.js`: review rendering and export pipeline
 - `editor.js`: import, task editing, and re-export pipeline

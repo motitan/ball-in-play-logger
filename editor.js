@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "ball-in-play-logger-session-v1";
   const REVIEW_SOURCE_KEY = "ball-in-play-logger-review-source-v1";
+  const PREFERENCES_STORAGE_KEY = window.BIPPreferences?.STORAGE_KEY || "ball-in-play-logger-preferences-v1";
   const EXPORT_COLUMNS = [
     "activity_id",
     "activity_name",
@@ -97,6 +98,7 @@
     el.alignSelectedEndBtn.addEventListener("click", () => applyAlignment("end", "selected"));
     el.alignSelectedBothBtn.addEventListener("click", () => applyAlignment("both", "selected"));
     el.editorTaskNameInput.addEventListener("input", handleTaskNameInput);
+    el.editorTaskNameInput.addEventListener("blur", commitTaskNameInput);
     el.editorTaskStartInput.addEventListener("change", () => handleTaskBoundaryInput("start"));
     el.editorTaskEndInput.addEventListener("change", () => handleTaskBoundaryInput("end"));
     el.editorTimelineMap.addEventListener("click", handleTaskSelect);
@@ -125,7 +127,7 @@
     }
 
     window.addEventListener("storage", (event) => {
-      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY].includes(event.key)) {
+      if (event.key && ![STORAGE_KEY, REVIEW_SOURCE_KEY, PREFERENCES_STORAGE_KEY].includes(event.key)) {
         return;
       }
       refreshRunningSession(true);
@@ -447,18 +449,27 @@
     }
 
     const previousState = state;
+    const persistedSource = loadPersistedEditorSource(previousState.selectedTaskId);
     const nextActivityId = liveSession.sessionId;
     const isDifferentLiveActivity = previousState.runningActivityId && previousState.runningActivityId !== nextActivityId;
     const previousSourceMode = previousState.sourceMode;
 
     state = buildEditorStateFromLiveSession(liveSession, previousState.selectedTaskId);
 
-    if (
+    const liveEditedSource =
       previousState.sourceMode === "live" &&
       previousState.dirty &&
       previousState.activityId === nextActivityId
-    ) {
-      state = reapplyLiveAlignmentState(state, previousState);
+        ? previousState
+        : persistedSource &&
+            persistedSource.sourceMode === "live" &&
+            persistedSource.dirty &&
+            persistedSource.activityId === nextActivityId
+          ? persistedSource
+          : null;
+
+    if (liveEditedSource) {
+      state = reapplyLiveEditingState(state, liveEditedSource);
     }
 
     if (announceOnSwitch || previousSourceMode !== "live" || isDifferentLiveActivity) {
@@ -706,19 +717,28 @@
   }
 
   function handleTaskNameInput(event) {
-    if (isLiveEditorLocked()) {
-      renderSelectedTaskPanel();
-      announce("Live activity only allows BIP alignment in Editor. Stop it in Logger before manual edits.");
-      return;
-    }
-
     const task = selectedTask();
     if (!task) {
       return;
     }
-    task.name = taskName(event.target.value, taskIndex(task.id) + 1).slice(0, MAX_TASK_NAME);
+    task.name = rawTaskName(event.target.value);
     state.dirty = true;
-    renderAll();
+    renderTimeline();
+    renderTaskTable();
+    syncReviewSourceStorage();
+  }
+
+  function commitTaskNameInput() {
+    const task = selectedTask();
+    if (!task) {
+      return;
+    }
+
+    task.name = taskName(task.name, taskIndex(task.id) + 1);
+    renderTimeline();
+    renderTaskTable();
+    renderSelectedTaskPanel();
+    syncReviewSourceStorage();
   }
 
   function handleTaskBoundaryInput(boundary) {
@@ -860,7 +880,7 @@
     el.editorSelectedTaskHint.textContent = hasTask
       ? liveLocked
         ? state.liveClockState === "running"
-          ? `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))} · align only while live`
+          ? `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))} · rename stays local, align only while live`
           : `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))} · paused in Logger`
         : `${task.bips.length} BIPs · ${task.rucks.length} rucks · ${formatCompactDuration(taskDurationMs(task))}`
       : "Select a task to unlock its name and bounds.";
@@ -975,9 +995,9 @@
                 <div class="review-table__task-meta">${task.bips.length ? `${task.bips.length} BIPs` : "No BIPs"} · ${task.rucks.length} rucks</div>
               </div>
             </td>
-            <td class="review-table__metric">${esc(formatSeconds(task.startMs))}s</td>
-            <td class="review-table__metric">${esc(formatSeconds(task.endMs))}s</td>
-            <td class="review-table__metric review-table__metric--accent">${esc(formatSeconds(taskDurationMs(task)))}s</td>
+            <td class="review-table__metric">${esc(formatWallClock(resolveTaskStartUnixMs(task)))}</td>
+            <td class="review-table__metric">${esc(formatWallClock(resolveTaskEndUnixMs(task)))}</td>
+            <td class="review-table__metric review-table__metric--accent">${esc(formatMinuteSecondClock(taskDurationMs(task)))}</td>
             <td>${task.bips.length}</td>
             <td>${task.rucks.length}</td>
             <td><button class="aux-btn aux-btn--table" type="button" data-task-id="${esc(task.id)}">${actionLabel}</button></td>
@@ -1185,7 +1205,7 @@
     el.editorTaskNameInput.disabled = selectedTaskDisabled;
     el.editorTaskStartInput.disabled = selectedTaskDisabled;
     el.editorTaskEndInput.disabled = selectedTaskDisabled;
-    el.editorTaskNameInput.readOnly = hasSelectedTask && liveLocked;
+    el.editorTaskNameInput.readOnly = false;
     el.editorTaskStartInput.readOnly = hasSelectedTask && liveLocked;
     el.editorTaskEndInput.readOnly = hasSelectedTask && liveLocked;
     el.alignSelectedStartBtn.disabled = selectedTaskDisabled;
@@ -1521,17 +1541,17 @@
     return state.tasks.length > 0 && (state.sourceMode === "file" || state.dirty);
   }
 
-  function reapplyLiveAlignmentState(nextState, previousState) {
+  function reapplyLiveEditingState(nextState, previousState) {
     const previousTasks = new Map(previousState.tasks.map((task) => [task.id, task]));
     let changed = false;
 
     const nextTasks = nextState.tasks.map((task) => {
       const previousTask = previousTasks.get(task.id);
-      const alignedTask = applyLiveAlignmentToEditorTask(task, previousTask, nextState.originUnixMs);
-      if (alignedTask !== task) {
+      const editedTask = applyLiveEditsToEditorTask(task, previousTask, nextState.originUnixMs);
+      if (editedTask !== task) {
         changed = true;
       }
-      return alignedTask;
+      return editedTask;
     });
 
     return changed
@@ -1543,24 +1563,34 @@
       : nextState;
   }
 
-  function applyLiveAlignmentToEditorTask(task, previousTask, originUnixMs) {
-    if (!previousTask || !task.bips.length) {
+  function applyLiveEditsToEditorTask(task, previousTask, originUnixMs) {
+    if (!previousTask) {
       return task;
     }
 
-    const alignStart = isTaskStartAlignedToFirstBip(previousTask);
-    const alignEnd = isTaskEndAlignedToLastBip(previousTask);
-    if (!alignStart && !alignEnd) {
-      return task;
-    }
-
+    let changed = false;
     const nextTask = { ...task };
+
+    if (previousTask.name !== task.name) {
+      nextTask.name = taskName(previousTask.name, taskIndex(task.id) + 1);
+      changed = true;
+    }
+
+    const alignStart = task.bips.length && isTaskStartAlignedToFirstBip(previousTask);
+    const alignEnd = task.bips.length && isTaskEndAlignedToLastBip(previousTask);
     if (alignStart) {
       nextTask.startMs = task.bips[0].startMs;
+      changed = true;
     }
     if (alignEnd) {
       nextTask.endMs = task.bips[task.bips.length - 1].endMs;
+      changed = true;
     }
+
+    if (!changed) {
+      return task;
+    }
+
     syncTaskUnixBounds(nextTask, originUnixMs);
     return nextTask;
   }
@@ -1885,8 +1915,12 @@
   }
 
   function taskName(value, fallbackIndex) {
-    const text = toText(value);
-    return text || `Task ${fallbackIndex}`;
+    const raw = rawTaskName(value);
+    return raw.trim() || `Task ${fallbackIndex}`;
+  }
+
+  function rawTaskName(value) {
+    return String(value ?? "").slice(0, MAX_TASK_NAME);
   }
 
   function bipLabel(value, fallbackIndex) {
@@ -1912,12 +1946,43 @@
       : `${pad2(minutes)}:${pad2(seconds)}`;
   }
 
+  function formatMinuteSecondClock(totalMs) {
+    const totalSeconds = Math.max(0, Math.floor(Number(totalMs || 0) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${pad2(seconds)}`;
+  }
+
+  function formatFullClock(totalMs) {
+    const totalSeconds = Math.max(0, Math.floor(Number(totalMs || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  }
+
+  function formatWallClock(unixMs) {
+    const safeUnixMs = Number(unixMs);
+    if (!Number.isFinite(safeUnixMs)) {
+      return "--:--:--";
+    }
+
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: getPreferredTimeZone(),
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date(safeUnixMs));
+  }
+
   function formatReviewDate(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
       return "Unknown import";
     }
     return new Intl.DateTimeFormat(undefined, {
+      timeZone: getPreferredTimeZone(),
       weekday: "short",
       day: "2-digit",
       month: "2-digit",
@@ -1925,6 +1990,10 @@
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  }
+
+  function getPreferredTimeZone() {
+    return window.BIPPreferences?.getResolvedTimeZone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   }
 
   function buildFilenameBase(activityName, isoDate) {
