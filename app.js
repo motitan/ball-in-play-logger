@@ -9,6 +9,8 @@
   const EXPORT_PERIOD = "Untitled Period";
   const CLOCK_TICK_MS = 250;
   const RUCK_WINDOW_MS = 1500;
+  const TIMELINE_ZOOM_MIN = 1;
+  const TIMELINE_ZOOM_MAX = 6;
 
   const MAX_ACTIVITY = 64;
   const MAX_PERIOD = 48;
@@ -78,6 +80,7 @@
     bipCount: document.getElementById("bipCount"),
     ruckCount: document.getElementById("ruckCount"),
     eventCount: document.getElementById("eventCount"),
+    timelineWorkbench: document.getElementById("timelineWorkbench"),
     timelineScale: document.getElementById("timelineScale"),
     timelineMap: document.getElementById("timelineMap"),
     timelineEmpty: document.getElementById("timelineEmpty"),
@@ -115,6 +118,7 @@
   let finishConfirmExpiresAt = 0;
   let finishConfirmTimer = null;
   let timePickerState = createTimePickerState();
+  let timelineZoomState = createTimelineZoomState();
   const zipEncoder = new TextEncoder();
   const crcTable = buildCrcTable();
 
@@ -145,6 +149,12 @@
     el.finishBtn.addEventListener("click", handleFinishIntent);
     el.logToggle.addEventListener("click", toggleLogDrawer);
     el.timelineMap.addEventListener("click", handleTimelineClick);
+    if (el.timelineWorkbench) {
+      el.timelineWorkbench.addEventListener("touchstart", handleTimelineTouchStart, { passive: false });
+      el.timelineWorkbench.addEventListener("touchmove", handleTimelineTouchMove, { passive: false });
+      el.timelineWorkbench.addEventListener("touchend", handleTimelineTouchEnd);
+      el.timelineWorkbench.addEventListener("touchcancel", handleTimelineTouchEnd);
+    }
     el.activityForm.addEventListener("submit", handleActivitySubmit);
     el.activityCancelBtn.addEventListener("click", closeActivityModal);
     el.timePickerBackdrop.addEventListener("click", closeTimePickerModal);
@@ -795,6 +805,10 @@
   }
 
   function handleTimelineClick(event) {
+    if (Date.now() < timelineZoomState.suppressClickUntil) {
+      return;
+    }
+
     const target = event.target.closest("[data-task-id]");
     if (!target) {
       return;
@@ -2227,6 +2241,7 @@
     el.timelineScale.innerHTML = hasTasks ? buildScale(snapshot.totalDurationMs) : "";
     el.timelineEmpty.hidden = hasTasks;
     el.timelineMap.innerHTML = hasTasks ? renderUnifiedTimeline(snapshot) : "";
+    updateTimelineZoomStyles();
   }
 
   function renderUnifiedTimeline(snapshot) {
@@ -2473,6 +2488,138 @@
 
   function getNextTaskName() {
     return taskLabel("", session.tasks.length + 1);
+  }
+
+  function handleTimelineTouchStart(event) {
+    if (!el.timelineWorkbench || event.touches.length !== 2) {
+      return;
+    }
+
+    const distance = getTouchDistance(event.touches);
+    if (!Number.isFinite(distance) || distance <= 0) {
+      return;
+    }
+
+    timelineZoomState.pinchActive = true;
+    timelineZoomState.pinchStartDistance = distance;
+    timelineZoomState.pinchStartScale = timelineZoomState.scale;
+    timelineZoomState.pinchAnchorRatio = getTouchAnchorRatio(event.touches, el.timelineWorkbench);
+  }
+
+  function handleTimelineTouchMove(event) {
+    if (!timelineZoomState.pinchActive || !el.timelineWorkbench || event.touches.length !== 2) {
+      return;
+    }
+
+    const distance = getTouchDistance(event.touches);
+    if (!Number.isFinite(distance) || distance <= 0 || timelineZoomState.pinchStartDistance <= 0) {
+      return;
+    }
+
+    event.preventDefault();
+    timelineZoomState.suppressClickUntil = Date.now() + 250;
+    setTimelineZoom(
+      timelineZoomState.pinchStartScale * (distance / timelineZoomState.pinchStartDistance),
+      getTouchAnchorRatio(event.touches, el.timelineWorkbench)
+    );
+  }
+
+  function handleTimelineTouchEnd(event) {
+    if (event.touches.length >= 2 && el.timelineWorkbench) {
+      const distance = getTouchDistance(event.touches);
+      if (Number.isFinite(distance) && distance > 0) {
+        timelineZoomState.pinchStartDistance = distance;
+        timelineZoomState.pinchStartScale = timelineZoomState.scale;
+        timelineZoomState.pinchAnchorRatio = getTouchAnchorRatio(event.touches, el.timelineWorkbench);
+      }
+      return;
+    }
+
+    timelineZoomState.pinchActive = false;
+    timelineZoomState.pinchStartDistance = 0;
+    timelineZoomState.pinchStartScale = timelineZoomState.scale;
+  }
+
+  function setTimelineZoom(nextScale, anchorRatio = 0.5) {
+    const viewport = el.timelineWorkbench;
+    const clampedScale = clampTimelineZoom(nextScale);
+    if (!viewport) {
+      timelineZoomState.scale = clampedScale;
+      return;
+    }
+
+    const previousScale = timelineZoomState.scale;
+    if (Math.abs(previousScale - clampedScale) < 0.001) {
+      return;
+    }
+
+    const viewportWidth = Math.max(1, viewport.clientWidth);
+    const safeAnchorRatio = Math.min(1, Math.max(0, anchorRatio));
+    const previousContentWidth = viewportWidth * previousScale;
+    const anchorContentRatio =
+      previousContentWidth > 0
+        ? (viewport.scrollLeft + viewportWidth * safeAnchorRatio) / previousContentWidth
+        : safeAnchorRatio;
+
+    timelineZoomState.scale = clampedScale;
+    updateTimelineZoomStyles();
+
+    const nextContentWidth = viewportWidth * clampedScale;
+    const nextScrollLeft = anchorContentRatio * nextContentWidth - viewportWidth * safeAnchorRatio;
+    viewport.scrollLeft = Math.max(0, Math.min(nextContentWidth - viewportWidth, nextScrollLeft));
+  }
+
+  function updateTimelineZoomStyles() {
+    const width = `${Math.max(TIMELINE_ZOOM_MIN, timelineZoomState.scale) * 100}%`;
+    if (el.timelineScale) {
+      el.timelineScale.style.width = width;
+    }
+    if (el.timelineMap) {
+      el.timelineMap.style.width = width;
+    }
+  }
+
+  function createTimelineZoomState() {
+    return {
+      scale: 1,
+      pinchActive: false,
+      pinchStartDistance: 0,
+      pinchStartScale: 1,
+      pinchAnchorRatio: 0.5,
+      suppressClickUntil: 0,
+    };
+  }
+
+  function getTouchDistance(touches) {
+    if (!touches || touches.length < 2) {
+      return 0;
+    }
+
+    const deltaX = touches[0].clientX - touches[1].clientX;
+    const deltaY = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(deltaX, deltaY);
+  }
+
+  function getTouchAnchorRatio(touches, container) {
+    if (!touches || touches.length < 2 || !container) {
+      return 0.5;
+    }
+
+    const rect = container.getBoundingClientRect();
+    if (!rect.width) {
+      return 0.5;
+    }
+
+    const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+    return Math.min(1, Math.max(0, (centerX - rect.left) / rect.width));
+  }
+
+  function clampTimelineZoom(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return timelineZoomState.scale;
+    }
+    return Math.min(TIMELINE_ZOOM_MAX, Math.max(TIMELINE_ZOOM_MIN, parsed));
   }
 
   function getTaskOrdinal(taskId) {
