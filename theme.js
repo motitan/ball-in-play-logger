@@ -1,7 +1,7 @@
 (() => {
   const THEME_COLORS = {
-    dark: "#0b0f14",
-    light: "#f7f2ea",
+    dark: "#0D0D0D",
+    light: "#F2F2F2",
   };
   const preferencesApi = window.BIPPreferences;
   const fallbackStorageKey = preferencesApi?.STORAGE_KEY || "ball-in-play-logger-preferences-v1";

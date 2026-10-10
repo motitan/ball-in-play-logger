@@ -1,0 +1,178 @@
+/* moti.sp tokens (copy for ball-in-play-logger: bundled fonts, no Google import, no Freshman). Generated from tokens.json (v4). Do not edit by hand. */
+
+
+
+@font-face { font-family: "Montserrat Variable"; src: url("./fonts/montserrat-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; font-display: swap; }
+
+:root {
+  /* Palette: same hex in every app. Use the semantic tokens below in components. */
+  --violet: #543178;
+  --lavender: #9F91E0;
+  --crimson: #B3292E;
+  --rose: #FF8D91;
+  --orange: #F26326;
+  --peach: #FFB78F;
+  --amber: #FFB81B;
+  --sand: #FAD992;
+  --gold: #CE8D03;
+  --green: #6AA43B;
+  --sage: #9EC17F;
+  --blue: #0E7DEC;
+  --sky: #7CB9F5;
+  --gray-50: #F2F2F2;
+  --gray-400: #A6A6A6;
+  --gray-700: #595959;
+  --gray-900: #262626;
+  --gray-950: #0D0D0D;
+  --charcoal: #353839;
+  --white: #FFFFFF;
+  --cream: #FFEAE1;
+  --plot-canvas: #F1EBE0;
+  --plot-grid: #DAD6CC;
+  --plot-line: #AFACA6;
+  --font-display: "Montserrat Variable", "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Montserrat Variable", "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-none: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-pill: 999px;
+}
+
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --bg: var(--gray-50);
+  --surface: var(--white);
+  --ink: var(--charcoal);
+  --ink-muted: var(--gray-700);
+  --border-subtle: var(--gray-400);
+  --border-strong: var(--gray-700);
+  --brand: var(--violet);
+  --on-brand: var(--white);
+  --brand-hover: var(--charcoal);
+  --accent: var(--amber);
+  --on-accent: var(--gray-950);
+  --tint-warm: var(--sand);
+  --link: var(--violet);
+  --focus-ring: var(--violet);
+  --danger: var(--crimson);
+  --on-danger: var(--white);
+  --warning: var(--orange);
+  --on-warning: var(--gray-950);
+  --success: var(--green);
+  --on-success: var(--gray-950);
+  --info: var(--blue);
+  --on-info: var(--gray-950);
+  --code-bg: var(--charcoal);
+  --code-ink: var(--gray-50);
+  --code-muted: var(--gray-400);
+  --code-prompt: var(--amber);
+  --plot-ink: var(--charcoal);
+  --plot-muted: var(--gray-700);
+  --shadow-stamp: 4px 4px 0 0 #0D0D0D;
+  --shadow-soft: 0 8px 24px rgba(13, 13, 13, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: var(--gray-950);
+    --surface: var(--gray-900);
+    --ink: var(--gray-50);
+    --ink-muted: var(--gray-400);
+    --border-subtle: var(--gray-700);
+    --border-strong: var(--gray-400);
+    --brand: var(--lavender);
+    --on-brand: var(--gray-950);
+    --brand-hover: var(--gray-50);
+    --accent: var(--amber);
+    --on-accent: var(--gray-950);
+    --tint-warm: var(--sand);
+    --link: var(--lavender);
+    --focus-ring: var(--amber);
+    --danger: var(--rose);
+    --on-danger: var(--gray-950);
+    --warning: var(--orange);
+    --on-warning: var(--gray-950);
+    --success: var(--green);
+    --on-success: var(--gray-950);
+    --info: var(--sky);
+    --on-info: var(--gray-950);
+    --code-bg: var(--charcoal);
+    --code-ink: var(--gray-50);
+    --code-muted: var(--gray-400);
+    --code-prompt: var(--amber);
+    --plot-ink: var(--charcoal);
+    --plot-muted: var(--gray-700);
+    --shadow-stamp: 4px 4px 0 0 #9F91E0;
+    --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: var(--gray-950);
+  --surface: var(--gray-900);
+  --ink: var(--gray-50);
+  --ink-muted: var(--gray-400);
+  --border-subtle: var(--gray-700);
+  --border-strong: var(--gray-400);
+  --brand: var(--lavender);
+  --on-brand: var(--gray-950);
+  --brand-hover: var(--gray-50);
+  --accent: var(--amber);
+  --on-accent: var(--gray-950);
+  --tint-warm: var(--sand);
+  --link: var(--lavender);
+  --focus-ring: var(--amber);
+  --danger: var(--rose);
+  --on-danger: var(--gray-950);
+  --warning: var(--orange);
+  --on-warning: var(--gray-950);
+  --success: var(--green);
+  --on-success: var(--gray-950);
+  --info: var(--sky);
+  --on-info: var(--gray-950);
+  --code-bg: var(--charcoal);
+  --code-ink: var(--gray-50);
+  --code-muted: var(--gray-400);
+  --code-prompt: var(--amber);
+  --plot-ink: var(--charcoal);
+  --plot-muted: var(--gray-700);
+  --shadow-stamp: 4px 4px 0 0 #9F91E0;
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* Chart series, in order. Draw marks with a 1px var(--plot-ink) outline: green, orange and amber are under 3:1 on plot-canvas. */
+:root {
+  --series-1: var(--violet);
+  --series-2: var(--amber);
+  --series-3: var(--blue);
+  --series-4: var(--green);
+  --series-5: var(--orange);
+  --series-6: var(--crimson);
+}
+
+/* App themes. Palette and semantic tokens stay identical; an app only chooses ground and accent.
+   Set <html data-app="..."> and data-theme. */
+
+/* gps_phd_loader: black ground, amber accent. Set data-theme="dark". */
+:root[data-app="gps_phd_loader"] {
+  --brand: var(--amber);
+  --on-brand: var(--gray-950);
+  --brand-hover: var(--sand);
+  --link: var(--amber);
+  --focus-ring: var(--amber);
+}
+
+/* witmotion_project: follows the system light or dark, violet and lavender accent. No overrides. */
+
+/* latchr: black ground, lavender accent (the dark defaults). Set data-theme="dark". No overrides. */

@@ -6,6 +6,10 @@ The format loosely follows Keep a Changelog.
 
 ## Unreleased
 
+### Changed
+
+- Adopted the moti.sp design kit: shared tokens (`moti-tokens.css`), bundled Montserrat, dark theme with amber brand, square corners, 4px spacing grid
+
 ### Added
 
 - Review page for current-session analytics and export
