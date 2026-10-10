@@ -254,9 +254,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   border: 1px solid var(--line-mid);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 46px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .theme-panel__eyebrow {
@@ -279,7 +277,7 @@ button {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   color: var(--muted-strong);
   font-weight: 700;
   text-align: left;
@@ -303,10 +301,8 @@ button {
 
 .theme-option[aria-pressed="true"] {
   color: var(--heading-strong);
-  border-color: color-mix(in srgb, var(--task) 30%, transparent);
-  background:
-    color-mix(in srgb, var(--task) 10%, transparent),
-    color-mix(in srgb, var(--task) 8%, transparent);
+  border-color: var(--task);
+  background: var(--surface);
 }
 
 .save-dot {
@@ -314,7 +310,7 @@ button {
   height: 6px;
   border-radius: var(--radius-sm);
   background: var(--play);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--play) 28%, transparent);
+  box-shadow: none;
   opacity: 0.82;
   transition: background var(--t-mid) ease;
 }
@@ -337,20 +333,20 @@ button {
 
 .state-pill--paused {
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface);
   border-color: var(--line);
 }
 
 .state-pill--running {
   color: var(--ink);
-  background: color-mix(in srgb, var(--play) 12%, transparent);
-  border-color: color-mix(in srgb, var(--play) 25%, transparent);
+  background: var(--surface);
+  border-color: var(--play);
 }
 
 .state-pill--finished {
   color: var(--ink);
-  background: color-mix(in srgb, var(--play) 16%, transparent);
-  border-color: color-mix(in srgb, var(--play) 32%, transparent);
+  background: var(--surface);
+  border-color: var(--play);
 }
 
 .main-grid {
@@ -368,9 +364,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 2px 14px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .col-clock {
@@ -385,7 +379,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--panel-inset);
   border: 1px solid var(--line);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .clock-display {
@@ -399,7 +393,7 @@ button {
 }
 
 .clock-display--running {
-  text-shadow: 0 0 40px color-mix(in srgb, var(--play) 20%, transparent);
+  text-shadow: none;
 }
 
 .live-status {
@@ -424,7 +418,7 @@ button {
   gap: 8px;
   padding: 8px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
   border: 1px solid var(--line);
   font-size: 0.8rem;
   font-weight: 600;
@@ -445,13 +439,13 @@ button {
 }
 
 .badge--task.badge--live {
-  background: color-mix(in srgb, var(--task) 7%, transparent);
-  border-color: color-mix(in srgb, var(--task) 22%, transparent);
+  background: var(--surface);
+  border-color: var(--task);
 }
 
 .badge--bip.badge--live {
-  background: color-mix(in srgb, var(--bip) 7%, transparent);
-  border-color: color-mix(in srgb, var(--bip) 22%, transparent);
+  background: var(--surface);
+  border-color: var(--bip);
 }
 
 .mini-stats {
@@ -467,7 +461,7 @@ button {
   gap: 4px;
   padding: 8px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   border: 1px solid var(--line);
   font-size: 0.72rem;
   color: var(--muted);
@@ -531,7 +525,7 @@ button {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.055);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -557,53 +551,53 @@ button {
 }
 
 .action-btn--play {
-  background: color-mix(in srgb, var(--play) 22%, transparent);
-  border-color: color-mix(in srgb, var(--play) 30%, transparent);
+  background: var(--surface);
+  border-color: var(--play);
   color: var(--ink);
 }
 
 .action-btn--pause {
-  background: color-mix(in srgb, var(--pause) 22%, transparent);
-  border-color: color-mix(in srgb, var(--pause) 28%, transparent);
+  background: var(--surface);
+  border-color: var(--pause);
   color: var(--ink);
 }
 
 .action-btn--task {
-  background: color-mix(in srgb, var(--task) 20%, transparent);
-  border-color: color-mix(in srgb, var(--task) 28%, transparent);
+  background: var(--surface);
+  border-color: var(--task);
   color: var(--ink);
 }
 
 .action-btn--task[data-active="true"] {
-  background: color-mix(in srgb, var(--danger) 26%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  background: var(--surface);
+  border-color: var(--danger);
   color: var(--ink);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: none;
 }
 
 .action-btn--bip {
-  background: color-mix(in srgb, var(--bip) 20%, transparent);
-  border-color: color-mix(in srgb, var(--bip) 28%, transparent);
+  background: var(--surface);
+  border-color: var(--bip);
   color: var(--ink);
 }
 
 .action-btn--bip[data-active="true"] {
-  background: color-mix(in srgb, var(--danger) 26%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  background: var(--surface);
+  border-color: var(--danger);
   color: var(--ink);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: none;
 }
 
 .action-btn--ruck {
-  background: color-mix(in srgb, var(--ruck) 20%, transparent);
-  border-color: color-mix(in srgb, var(--ruck) 28%, transparent);
+  background: var(--surface);
+  border-color: var(--ruck);
   color: var(--ink);
 }
 
 .action-btn:hover:not([disabled]),
 .action-btn:focus-visible:not([disabled]) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  box-shadow: none;
   outline: none;
 }
 
@@ -629,7 +623,7 @@ button {
 .selected-task-panel {
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
 }
 
 .field-block {
@@ -642,10 +636,8 @@ button {
 .field-block--task-flow {
   justify-content: center;
   min-height: 84px;
-  border-color: color-mix(in srgb, var(--ruck) 20%, transparent);
-  background:
-    color-mix(in srgb, var(--ruck) 5%, transparent),
-    rgba(255, 255, 255, 0.02);
+  border-color: var(--ruck);
+  background: var(--surface);
 }
 
 .field-block__top {
@@ -670,55 +662,42 @@ button {
 
 .field-block input {
   width: 100%;
-  padding: 8px 12px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--line-mid);
   border-radius: var(--radius-sm);
-  background: var(--panel-inset);
+  background: var(--surface);
   color: var(--text);
   font-size: 0.86rem;
-  border-left: 3px solid transparent;
   transition: border-color var(--t-mid) ease, box-shadow var(--t-mid) ease;
 }
 
 .field-block select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid var(--line-mid);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--panel-inset);
+  background: var(--surface);
   color: var(--text);
   font-size: 0.86rem;
   transition: border-color var(--t-mid) ease, box-shadow var(--t-mid) ease;
 }
 
-.field-block--activity input {
-  border-left-color: color-mix(in srgb, var(--task) 60%, transparent);
-}
-
-.field-block--period input {
-  border-left-color: color-mix(in srgb, var(--play) 60%, transparent);
-}
-
-.field-block--task input,
-.field-block--selected input {
-  border-left-color: color-mix(in srgb, var(--ruck) 55%, transparent);
-}
-
 .field-block input::placeholder {
-  color: rgba(140, 151, 164, 0.44);
+  color: var(--ink-muted);
   font-size: 0.8rem;
 }
 
 .field-block input:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--play) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--play) 8%, transparent);
+  border-color: var(--brand);
+  box-shadow: none;
 }
 
 .field-block select:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--play) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--play) 8%, transparent);
+  border-color: var(--brand);
+  box-shadow: none;
 }
 
 .selected-task-panel {
@@ -774,8 +753,8 @@ button {
 
 .selected-task-panel[data-state="active"] .selected-task-panel__state {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 26%, transparent);
-  background: color-mix(in srgb, var(--play) 11%, transparent);
+  border-color: var(--play);
+  background: var(--surface);
 }
 
 .selected-task-panel__actions {
@@ -800,9 +779,7 @@ button {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-mid);
-  background:
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   text-align: left;
   cursor: pointer;
   transition:
@@ -815,10 +792,8 @@ button {
 .selected-task-time:hover:not([disabled]),
 .selected-task-time:focus-visible:not([disabled]) {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--task) 24%, transparent);
-  background:
-    color-mix(in srgb, var(--task) 8%, transparent),
-    rgba(255, 255, 255, 0.025);
+  border-color: var(--task);
+  background: var(--surface);
   outline: none;
 }
 
@@ -830,9 +805,7 @@ button {
 .selected-task-time--static:focus-visible {
   transform: none;
   border-color: var(--line-mid);
-  background:
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0.02);
+  background: var(--surface);
 }
 
 .selected-task-time:active:not([disabled]) {
@@ -860,10 +833,8 @@ button {
 }
 
 .selected-task-panel[data-state="active"] .selected-task-time:last-child {
-  border-color: color-mix(in srgb, var(--play) 24%, transparent);
-  background:
-    color-mix(in srgb, var(--play) 8%, transparent),
-    rgba(255, 255, 255, 0.02);
+  border-color: var(--play);
+  background: var(--surface);
 }
 
 .aux-btn,
@@ -879,7 +850,7 @@ button {
   padding: 8px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   cursor: pointer;
   font-size: 0.73rem;
   font-weight: 700;
@@ -894,7 +865,7 @@ button {
 .finish-btn:hover:not([disabled]),
 .modal-btn:hover:not([disabled]) {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -918,17 +889,17 @@ button {
 .aux-btn--primary,
 .modal-btn--primary {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 30%, transparent);
-  background: color-mix(in srgb, var(--play) 10%, transparent);
+  border-color: var(--play);
+  background: var(--surface);
 }
 
 .aux-btn--danger {
-  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  border-color: var(--danger);
   color: var(--ink);
 }
 
 .aux-btn--danger:hover:not([disabled]) {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  background: var(--surface);
 }
 
 .export-row {
@@ -950,38 +921,38 @@ button {
   width: 100%;
   justify-content: center;
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 30%, transparent);
-  background: color-mix(in srgb, var(--play) 10%, transparent);
+  border-color: var(--play);
+  background: var(--surface);
 }
 
 .export-btn--danger {
-  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  border-color: var(--danger);
   color: var(--ink);
 }
 
 .export-btn--danger:hover {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  background: var(--surface);
 }
 
 .finish-btn {
   width: 100%;
   justify-content: center;
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
+  border-color: var(--danger);
+  background: var(--surface);
 }
 
 .finish-btn[data-state="armed"] {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--danger) 46%, transparent);
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 22%, transparent);
+  border-color: var(--danger);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 .finish-btn[data-state="finished"] {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 28%, transparent);
-  background: color-mix(in srgb, var(--play) 8%, transparent);
+  border-color: var(--play);
+  background: var(--surface);
 }
 
 .timeline-strip {
@@ -1036,21 +1007,21 @@ button {
   grid-template-columns: minmax(320px, 1.06fr) minmax(0, 1.54fr);
   gap: 8px;
   align-items: stretch;
-  --review-mode-accent: color-mix(in srgb, var(--bip) 95%, transparent);
-  --review-mode-accent-soft: color-mix(in srgb, var(--bip) 14%, transparent);
-  --review-mode-accent-border: color-mix(in srgb, var(--bip) 24%, transparent);
+  --review-mode-accent: var(--bip);
+  --review-mode-accent-soft: var(--surface);
+  --review-mode-accent-border: var(--border-subtle);
   --review-mode-accent-text: var(--ink);
-  --review-mode-note-bg: color-mix(in srgb, var(--play) 12%, transparent);
-  --review-mode-note-border: color-mix(in srgb, var(--play) 22%, transparent);
+  --review-mode-note-bg: var(--surface);
+  --review-mode-note-border: var(--border-subtle);
 }
 
 .review-overview[data-metric-mode="task"] {
-  --review-mode-accent: color-mix(in srgb, var(--pause) 96%, transparent);
-  --review-mode-accent-soft: color-mix(in srgb, var(--pause) 15%, transparent);
-  --review-mode-accent-border: color-mix(in srgb, var(--pause) 28%, transparent);
+  --review-mode-accent: var(--pause);
+  --review-mode-accent-soft: var(--surface);
+  --review-mode-accent-border: var(--border-subtle);
   --review-mode-accent-text: var(--ink);
-  --review-mode-note-bg: color-mix(in srgb, var(--pause) 12%, transparent);
-  --review-mode-note-border: color-mix(in srgb, var(--pause) 24%, transparent);
+  --review-mode-note-bg: var(--surface);
+  --review-mode-note-border: var(--border-subtle);
 }
 
 .editor-overview {
@@ -1078,13 +1049,9 @@ button {
   gap: 8px;
   padding: 16px;
   border-radius: var(--radius-sm);
-  background:
-    rgba(255, 255, 255, 0.025),
-    var(--panel);
+  background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 10px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
 }
 
 .settings-preview__clock {
@@ -1121,10 +1088,8 @@ button {
 
 .settings-choice[aria-pressed="true"] {
   color: var(--heading-strong);
-  border-color: color-mix(in srgb, var(--task) 28%, transparent);
-  background:
-    color-mix(in srgb, var(--task) 8%, transparent),
-    color-mix(in srgb, var(--task) 8%, transparent);
+  border-color: var(--task);
+  background: var(--surface);
 }
 
 .settings-custom-time-zone {
@@ -1138,7 +1103,7 @@ button {
   padding: 16px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
 }
 
 .settings-note__copy,
@@ -1165,13 +1130,9 @@ button {
 .review-kpi,
 .editor-metrics-strip {
   border-radius: var(--radius-sm);
-  background:
-    rgba(255, 255, 255, 0.02),
-    var(--panel);
+  background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 10px 30px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .review-hero {
@@ -1180,10 +1141,7 @@ button {
   gap: 16px;
   padding: 16px 20px;
   align-items: start;
-  background:
-    var(--review-mode-accent-soft),
-    rgba(255, 255, 255, 0.02),
-    var(--panel);
+  background: var(--surface);
   border-color: var(--review-mode-accent-border);
 }
 
@@ -1299,19 +1257,19 @@ button {
 }
 
 .review-kpi--work {
-  border-color: color-mix(in srgb, var(--bip) 18%, transparent);
+  border-color: var(--border-subtle);
 }
 
 .review-kpi--rest {
-  border-color: color-mix(in srgb, var(--pause) 18%, transparent);
+  border-color: var(--border-subtle);
 }
 
 .review-kpi--phase {
-  border-color: color-mix(in srgb, var(--ruck) 18%, transparent);
+  border-color: var(--border-subtle);
 }
 
 .review-kpi--clock {
-  border-color: color-mix(in srgb, var(--task) 18%, transparent);
+  border-color: var(--border-subtle);
 }
 
 .review-kpi--gauge {
@@ -1327,7 +1285,7 @@ button {
 
 .ratio-gauge {
   --ratio: 0deg;
-  --ratio-color: color-mix(in srgb, var(--bip) 95%, transparent);
+  --ratio-color: var(--bip);
   position: relative;
   display: grid;
   place-items: center;
@@ -1338,8 +1296,8 @@ button {
   border-radius: var(--radius-sm);
   background:
     var(--panel) 0,
-    conic-gradient(var(--ratio-color) 0deg, var(--ratio-color) var(--ratio), rgba(255, 255, 255, 0.08) var(--ratio), rgba(255, 255, 255, 0.08) 360deg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    conic-gradient(var(--ratio-color) 0deg, var(--ratio-color) var(--ratio), var(--border-subtle) var(--ratio), var(--border-subtle) 360deg);
+  box-shadow: none;
 }
 
 .ratio-gauge__value {
@@ -1393,11 +1351,9 @@ button {
   width: fit-content;
   padding: 8px;
   border-radius: var(--radius-sm);
-  background:
-    rgba(255, 255, 255, 0.035),
-    rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border: 1px solid var(--line-mid);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 .review-toggle__btn {
@@ -1406,7 +1362,7 @@ button {
   min-height: 46px;
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  background: rgba(7, 10, 15, 0.38);
+  background: var(--surface);
   border-color: var(--line);
 }
 
@@ -1416,19 +1372,19 @@ button {
 
 .review-toggle__btn[aria-pressed="false"]:hover:not([disabled]),
 .review-toggle__btn[aria-pressed="false"]:focus-visible:not([disabled]) {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface);
 }
 
 .review-toggle__btn--task[aria-pressed="true"] {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--pause) 34%, transparent);
-  background: color-mix(in srgb, var(--pause) 14%, transparent);
+  border-color: var(--border-subtle);
+  background: var(--surface);
 }
 
 .review-toggle__btn--bip[aria-pressed="true"] {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 30%, transparent);
-  background: color-mix(in srgb, var(--play) 10%, transparent);
+  border-color: var(--border-subtle);
+  background: var(--surface);
 }
 
 .review-mode-note {
@@ -1436,9 +1392,7 @@ button {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--review-mode-note-border);
-  background:
-    rgba(255, 255, 255, 0.03),
-    var(--review-mode-note-bg);
+  background: var(--surface);
   color: var(--review-mode-accent-text);
   font-size: 0.76rem;
   line-height: 1.45;
@@ -1465,7 +1419,7 @@ button {
   min-height: 70px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--surface);
   border: 1px solid var(--line);
   text-align: center;
 }
@@ -1487,17 +1441,13 @@ button {
 
 .review-overview[data-metric-mode="bip"] .review-kpi--work,
 .review-overview[data-metric-mode="bip"] .review-kpi--gauge {
-  background:
-    color-mix(in srgb, var(--bip) 7%, transparent),
-    var(--panel);
+  background: var(--surface);
 }
 
 .review-overview[data-metric-mode="task"] .review-kpi--work,
 .review-overview[data-metric-mode="task"] .review-kpi--gauge {
-  border-color: color-mix(in srgb, var(--pause) 22%, transparent);
-  background:
-    color-mix(in srgb, var(--pause) 8%, transparent),
-    var(--panel);
+  border-color: var(--border-subtle);
+  background: var(--surface);
 }
 
 .review-panel--table {
@@ -1575,15 +1525,15 @@ button {
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(208, 226, 248, 0.92);
-  background: color-mix(in srgb, var(--task) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--task) 22%, transparent);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
 }
 
 .review-badge--live {
   color: var(--ink);
-  background: color-mix(in srgb, var(--play) 16%, transparent);
-  border-color: color-mix(in srgb, var(--play) 24%, transparent);
+  background: var(--surface);
+  border-color: var(--border-subtle);
 }
 
 .review-table__task-meta {
@@ -1599,13 +1549,9 @@ button {
   width: min(520px, 100%);
   padding: 32px 32px 32px;
   border-radius: var(--radius-sm);
-  background:
-    rgba(255, 255, 255, 0.02),
-    var(--panel);
+  background: var(--surface);
   border: 1px solid var(--line-mid);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 16px 40px rgba(0, 0, 0, 0.34);
+  box-shadow: none;
   text-align: center;
 }
 
@@ -1690,7 +1636,7 @@ button {
   min-height: 68px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.024);
+  background: var(--surface);
   border: 1px solid var(--line);
 }
 
@@ -1700,7 +1646,7 @@ button {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bip) 12%, transparent);
+  background: var(--surface);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 0.74rem;
@@ -1754,13 +1700,9 @@ button {
   max-width: none;
   padding: 16px 16px 16px;
   border-radius: var(--radius-sm);
-  border: 1px dashed color-mix(in srgb, var(--bip) 30%, transparent);
-  background:
-    color-mix(in srgb, var(--bip) 18%, transparent),
-    rgba(9, 14, 20, 0.74);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--task) 14%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--bip) 10%, transparent);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  box-shadow: none;
   cursor: pointer;
   transition:
     border-color var(--t-mid) ease,
@@ -1772,27 +1714,18 @@ button {
 .editor-import:hover,
 .editor-import--dragover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--bip) 34%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--task) 18%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--bip) 14%, transparent),
-    0 12px 36px rgba(0, 0, 0, 0.26);
-  background:
-    color-mix(in srgb, var(--bip) 12%, transparent),
-    rgba(9, 14, 20, 0.82);
+  border-color: var(--bip);
+  box-shadow: none;
+  background: var(--surface);
 }
 
 .editor-import--disabled,
 .editor-import--disabled:hover {
   transform: none;
   cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  background:
-    rgba(255, 255, 255, 0.04),
-    rgba(9, 14, 20, 0.72);
+  border-color: var(--border-subtle);
+  box-shadow: none;
+  background: var(--surface);
 }
 
 .editor-import input {
@@ -1822,7 +1755,7 @@ button {
 
 .editor-import__copy {
   grid-area: copy;
-  color: rgba(223, 232, 240, 0.9);
+  color: var(--ink);
   font-size: 0.76rem;
   line-height: 1.28;
   max-width: none;
@@ -1836,7 +1769,7 @@ button {
   gap: 8px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bip) 18%, transparent);
+  background: var(--surface);
   color: var(--ink);
   font-size: 0.7rem;
   font-weight: 800;
@@ -1924,34 +1857,34 @@ button {
 
 .export-btn--csv {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--bip) 30%, transparent);
-  background: color-mix(in srgb, var(--bip) 10%, transparent);
+  border-color: var(--bip);
+  background: var(--surface);
 }
 
 .export-btn--csv:hover:not([disabled]) {
-  background: color-mix(in srgb, var(--bip) 18%, transparent);
+  background: var(--surface);
   color: var(--ink);
 }
 
 .export-btn--json {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--task) 30%, transparent);
-  background: color-mix(in srgb, var(--task) 10%, transparent);
+  border-color: var(--task);
+  background: var(--surface);
 }
 
 .export-btn--json:hover:not([disabled]) {
-  background: color-mix(in srgb, var(--task) 18%, transparent);
+  background: var(--surface);
   color: var(--ink);
 }
 
 .export-btn--zip {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--ruck) 30%, transparent);
-  background: color-mix(in srgb, var(--ruck) 10%, transparent);
+  border-color: var(--ruck);
+  background: var(--surface);
 }
 
 .export-btn--zip:hover:not([disabled]) {
-  background: color-mix(in srgb, var(--ruck) 18%, transparent);
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -2148,7 +2081,7 @@ button {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
   text-align: left;
   cursor: pointer;
   transition:
@@ -2159,12 +2092,12 @@ button {
 
 .editor-track-row__meta:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--task) 26%, transparent);
+  border-color: var(--task);
 }
 
 .editor-track-row--selected .editor-track-row__meta {
-  border-color: color-mix(in srgb, var(--task) 30%, transparent);
-  background: color-mix(in srgb, var(--task) 8%, transparent);
+  border-color: var(--task);
+  background: var(--surface);
 }
 
 .editor-track-row__name {
@@ -2182,7 +2115,7 @@ button {
 }
 
 .editor-table__row--selected {
-  background: color-mix(in srgb, var(--task) 6%, transparent);
+  background: var(--surface);
 }
 
 .timeline-workbench {
@@ -2190,13 +2123,13 @@ button {
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: none;
   max-height: 176px;
   overflow-x: auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.09) transparent;
+  scrollbar-color: var(--border-strong) transparent;
   overscroll-behavior-x: contain;
 }
 
@@ -2213,7 +2146,7 @@ button {
 }
 
 .timeline-workbench::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface);
   border-radius: var(--radius-sm);
 }
 
@@ -2235,7 +2168,7 @@ button {
 .timeline-scale__item::before {
   content: "";
   height: 5px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .timeline-scale__label {
@@ -2286,7 +2219,7 @@ button {
   position: relative;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(4, 8, 12, 0.65);
+  background: var(--surface);
 }
 
 .timeline-lane--tasks {
@@ -2301,7 +2234,7 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -2320,16 +2253,16 @@ button {
 .task-span {
   top: 7px;
   height: 12px;
-  background: color-mix(in srgb, var(--task) 90%, transparent);
-  border-color: rgba(200, 224, 252, 0.14);
+  background: var(--surface);
+  border-color: var(--border-subtle);
 }
 
 .task-span--active {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--task) 26%, transparent), 0 0 14px color-mix(in srgb, var(--task) 14%, transparent);
+  box-shadow: none;
 }
 
 .task-span--selected {
-  box-shadow: 0 0 0 2px rgba(235, 243, 252, 0.34);
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .task-span__label,
@@ -2340,7 +2273,7 @@ button {
   transform: translateY(-50%);
   font-size: 0.55rem;
   font-weight: 800;
-  color: rgba(6, 14, 24, 0.85);
+  color: var(--gray-950);
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
@@ -2348,12 +2281,12 @@ button {
 .bip-span {
   top: 11px;
   height: 11px;
-  background: color-mix(in srgb, var(--bip) 90%, transparent);
-  border-color: rgba(200, 240, 180, 0.14);
+  background: var(--surface);
+  border-color: var(--border-subtle);
 }
 
 .bip-span--active {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bip) 26%, transparent), 0 0 14px color-mix(in srgb, var(--bip) 12%, transparent);
+  box-shadow: none;
 }
 
 .ruck-marker {
@@ -2365,7 +2298,7 @@ button {
   padding: 0;
   border-radius: var(--radius-sm);
   background: var(--ruck);
-  border: 1px solid rgba(255, 240, 200, 0.18);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
   appearance: none;
 }
@@ -2378,14 +2311,14 @@ button {
   width: 1px;
   height: 8px;
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--ruck) 44%, transparent);
+  background: var(--ruck);
 }
 
 .empty-state {
   padding: 16px;
   border-radius: var(--radius-sm);
-  border: 1px dashed rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.015);
+  border: 1px dashed var(--border-subtle);
+  background: var(--surface);
   text-align: center;
 }
 
@@ -2449,7 +2382,7 @@ button {
   height: 17px;
   padding: 0 4px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--surface);
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -2468,9 +2401,9 @@ button {
   border-bottom: none;
   border-radius: var(--radius-sm);
   padding: 8px 12px;
-  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.09) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 .log-content::-webkit-scrollbar {
@@ -2482,7 +2415,7 @@ button {
 }
 
 .log-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface);
   border-radius: var(--radius-sm);
 }
 
@@ -2500,7 +2433,7 @@ button {
   padding: 8px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: rgba(10, 15, 20, 0.7);
+  background: var(--surface);
   font-size: 0.79rem;
 }
 
@@ -2570,9 +2503,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--panel-strong);
   border: 1px solid var(--line-mid);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 20px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
 }
 
 .activity-modal__eyebrow {
@@ -2629,14 +2560,9 @@ button {
   width: min(540px, calc(100vw - 28px));
   padding: 20px;
   border-radius: var(--radius-sm);
-  background:
-    color-mix(in srgb, var(--task) 8%, transparent),
-    rgba(255, 255, 255, 0.03),
-    var(--panel-strong);
+  background: var(--surface);
   border: 1px solid var(--line-mid);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 24px 84px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
 }
 
 .time-picker-modal__head {
@@ -2692,9 +2618,7 @@ button {
   padding: 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-mid);
-  background:
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0.015);
+  background: var(--surface);
   overflow: hidden;
 }
 
@@ -2706,11 +2630,9 @@ button {
   height: 46px;
   transform: translateY(-50%);
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--task) 24%, transparent);
-  background:
-    color-mix(in srgb, var(--task) 10%, transparent),
-    rgba(255, 255, 255, 0.02);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -2727,12 +2649,12 @@ button {
 
 .time-picker-wheel__viewport::before {
   top: 0;
-  background: rgba(16, 22, 32, 0.96);
+  background: transparent;
 }
 
 .time-picker-wheel__viewport::after {
   bottom: 0;
-  background: rgba(16, 22, 32, 0.96);
+  background: var(--surface);
 }
 
 .time-picker-wheel__list {
@@ -2780,199 +2702,6 @@ button {
   transform: scale(1.04);
 }
 
-html[data-theme="light"] .review-toggle__btn {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: rgba(64, 78, 97, 0.11);
-}
-
-html[data-theme="light"] .page-tab--active {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--task) 24%, transparent);
-}
-
-html[data-theme="light"] .review-toggle__btn[aria-pressed="false"]:hover:not([disabled]),
-html[data-theme="light"] .review-toggle__btn[aria-pressed="false"]:focus-visible:not([disabled]) {
-  background: color-mix(in srgb, var(--task) 12%, transparent);
-}
-
-html[data-theme="light"] .state-pill--running,
-html[data-theme="light"] .state-pill--finished,
-html[data-theme="light"] .selected-task-panel[data-state="active"] .selected-task-panel__state,
-html[data-theme="light"] .aux-btn--primary,
-html[data-theme="light"] .modal-btn--primary,
-html[data-theme="light"] .new-activity-btn,
-html[data-theme="light"] .finish-btn[data-state="finished"],
-html[data-theme="light"] .review-toggle__btn--bip[aria-pressed="true"],
-html[data-theme="light"] .review-badge--live {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 34%, transparent);
-  background: color-mix(in srgb, var(--bip) 18%, transparent);
-}
-
-html[data-theme="light"] .aux-btn[disabled],
-html[data-theme="light"] .new-activity-btn[disabled],
-html[data-theme="light"] .finish-btn[disabled],
-html[data-theme="light"] .modal-btn[disabled] {
-  opacity: 0.62;
-}
-
-html[data-theme="light"] .aux-btn--primary[disabled],
-html[data-theme="light"] .modal-btn--primary[disabled] {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 22%, transparent);
-  background: color-mix(in srgb, var(--bip) 12%, transparent);
-}
-
-html[data-theme="light"] .badge--bip.badge--live,
-html[data-theme="light"] .selected-task-panel[data-state="active"] .selected-task-time:last-child,
-html[data-theme="light"] .review-overview[data-metric-mode="bip"] .review-kpi--work,
-html[data-theme="light"] .review-overview[data-metric-mode="bip"] .review-kpi--gauge {
-  border-color: color-mix(in srgb, var(--bip) 28%, transparent);
-  background:
-    color-mix(in srgb, var(--bip) 12%, transparent),
-    rgba(255, 255, 255, 0.02);
-}
-
-html[data-theme="light"] .review-mode-note {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .top-bar__tag--activity {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .top-bar__tag--period {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .save-dot {
-  opacity: 1;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--play) 28%, transparent);
-}
-
-html[data-theme="light"] .editor-guide__index {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .action-btn--play {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 34%, transparent);
-  background: color-mix(in srgb, var(--bip) 28%, transparent);
-}
-
-html[data-theme="light"] .action-btn--bip {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 32%, transparent);
-  background: color-mix(in srgb, var(--bip) 24%, transparent);
-}
-
-html[data-theme="light"] .editor-import__cta {
-  background: color-mix(in srgb, var(--bip) 28%, transparent);
-  color: var(--ink);
-}
-
-html[data-theme="light"] .badge--task.badge--live,
-html[data-theme="light"] .review-badge {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--task) 32%, transparent);
-  background: color-mix(in srgb, var(--task) 16%, transparent);
-}
-
-html[data-theme="light"] .editor-import__eyebrow {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .editor-import__copy {
-  color: var(--text-sub);
-}
-
-html[data-theme="light"] .export-btn--csv {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--play) 34%, transparent);
-  background: color-mix(in srgb, var(--bip) 18%, transparent);
-}
-
-html[data-theme="light"] .export-btn--csv:hover:not([disabled]) {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--bip) 26%, transparent);
-}
-
-html[data-theme="light"] .export-btn--json {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--task) 34%, transparent);
-  background: color-mix(in srgb, var(--task) 16%, transparent);
-}
-
-html[data-theme="light"] .export-btn--json:hover:not([disabled]) {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--task) 24%, transparent);
-}
-
-html[data-theme="light"] .task-span {
-  background: color-mix(in srgb, var(--task) 94%, transparent);
-  border-color: rgba(255, 255, 255, 0.26);
-}
-
-html[data-theme="light"] .task-span--active {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--task) 24%, transparent), 0 0 14px color-mix(in srgb, var(--task) 16%, transparent);
-}
-
-html[data-theme="light"] .bip-span {
-  background: color-mix(in srgb, var(--bip) 94%, transparent);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-html[data-theme="light"] .bip-span--active {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bip) 24%, transparent), 0 0 14px color-mix(in srgb, var(--bip) 18%, transparent);
-}
-
-html[data-theme="light"] .editor-import,
-html[data-theme="light"] .editor-import--disabled,
-html[data-theme="light"] .timeline-lane,
-html[data-theme="light"] .log-content {
-  background:
-    rgba(255, 255, 255, 0.5),
-    rgba(244, 239, 230, 0.84);
-}
-
-html[data-theme="light"] .editor-import:hover,
-html[data-theme="light"] .editor-import--dragover {
-  background:
-    color-mix(in srgb, var(--bip) 12%, transparent),
-    rgba(246, 241, 233, 0.96);
-}
-
-html[data-theme="light"] .review-table__metric--accent {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .review-table__metric--muted {
-  color: var(--ink);
-}
-
-html[data-theme="light"] .time-picker-wheel__viewport::before {
-  background: rgba(247, 242, 234, 0.96);
-}
-
-html[data-theme="light"] .time-picker-wheel__viewport::after {
-  background: rgba(247, 242, 234, 0.96);
-}
-
-html[data-theme="light"] .review-title,
-html[data-theme="light"] .review-kpi__value,
-html[data-theme="light"] .review-panel__title,
-html[data-theme="light"] .editor-import__title,
-html[data-theme="light"] .editor-metric__value,
-html[data-theme="light"] .editor-guide__copy strong,
-html[data-theme="light"] .selected-task-panel__title,
-html[data-theme="light"] .selected-task-time__value,
-html[data-theme="light"] .bucket-chip__value {
-  color: var(--heading-strong);
-}
-
-html[data-theme="light"] .settings-note__status[data-state="error"] {
-  color: var(--danger);
-}
 
 .time-picker-modal__actions {
   display: grid;
@@ -3317,3 +3046,40 @@ html[data-theme="light"] .settings-note__status[data-state="error"] {
     transform: translateY(0);
   }
 }
+
+/* ---- Kit rules: flat surfaces, 1px edges, solid fills for action and state ---- */
+:root[data-app="ball-in-play-logger"] {
+  --brand: var(--amber);
+  --on-brand: var(--gray-950);
+  --brand-hover: var(--gold);
+  --link: var(--gold);
+  --focus-ring: var(--amber);
+}
+:root[data-app="ball-in-play-logger"][data-theme="dark"] {
+  --brand-hover: var(--sand);
+  --link: var(--amber);
+}
+.action-btn--play { background: var(--success); border-color: var(--success); color: var(--on-success); }
+.action-btn--pause { background: var(--warning); border-color: var(--warning); color: var(--on-warning); }
+.action-btn--task { background: var(--surface); border-color: var(--task); color: var(--ink); }
+.action-btn--bip { background: var(--surface); border-color: var(--bip); color: var(--ink); }
+.action-btn--ruck { background: var(--surface); border-color: var(--ruck); color: var(--ink); }
+.action-btn--task[data-active="true"],
+.action-btn--bip[data-active="true"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.action-btn[disabled] { background: var(--bg); border-color: var(--border-subtle); color: var(--ink-muted); opacity: 1; }
+.action-btn:hover:not([disabled]) { box-shadow: var(--shadow-stamp); }
+.state-pill--running, .state-pill--finished { background: var(--success); border-color: var(--success); color: var(--on-success); }
+.state-pill--paused { background: transparent; border-color: var(--border-strong); color: var(--ink); }
+.panel, .clock-display-wrap { box-shadow: none; }
+input, select, textarea { background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); }
+.task-span { background: var(--task); border-color: var(--ink); }
+.bip-span { background: var(--bip); border-color: var(--ink); }
+.timeline-workbench::-webkit-scrollbar-thumb,
+.log-content::-webkit-scrollbar-thumb { background: var(--border-strong); }
+.aux-btn--primary, .modal-btn--primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.aux-btn--primary:hover:not([disabled]), .modal-btn--primary:hover:not([disabled]) { background: var(--brand-hover); border-color: var(--brand-hover); }
+.finish-btn[data-state="armed"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.theme-option[aria-pressed="true"],
+.settings-choice[aria-pressed="true"],
+.review-toggle__btn[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.aux-btn--primary[disabled], .modal-btn--primary[disabled] { opacity: 0.5; }
